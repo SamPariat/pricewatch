@@ -1,0 +1,18 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 375, "h": 950 },
+    { "file": "WatchDetailMobile.dc.html", "x": 423, "y": 0, "w": 375, "h": 1030 },
+    { "file": "WatchBuilderMobile.dc.html", "x": 846, "y": 0, "w": 375, "h": 1090 },
+    { "file": "RunTimelineMobile.dc.html", "x": 1269, "y": 0, "w": 375, "h": 1130 },
+    { "file": "TelegramDigest.dc.html", "x": 1692, "y": 0, "w": 375, "h": 800 },
+    { "file": "DashboardDesktop.dc.html", "x": 0, "y": 1230, "w": 1280, "h": 880 },
+    { "file": "WatchDetailDesktop.dc.html", "x": 1344, "y": 1230, "w": 1280, "h": 880 },
+    { "file": "SettingsDesktop.dc.html", "x": 2688, "y": 1230, "w": 1280, "h": 950 }
+  ],
+  "annotations": [
+    { "id": "note-mobile", "x": 0, "y": -80, "w": 300, "text": "Mobile (375px) — shadcn/ui tokens and component anatomy (Card, Badge, Tabs, Switch), real default theme values, light + dark via the Theme tweak. Card D demonstrates the staleness badge: a silently-broken watch must never look like a watch whose price simply hasn't moved." },
+    { "id": "note-telegram", "x": 1692, "y": -80, "w": 300, "text": "Digest as it actually renders — Telegram HTML parse mode only supports bold / code / links, so hierarchy relies on weight and monospace, not color. Has its own light/dark toggle, independent of the app's shadcn tokens." },
+    { "id": "note-desktop", "x": 0, "y": 1140, "w": 300, "text": "Desktop (1280px) — same shadcn system, denser: a sortable table replaces cards, sidebar uses the real --sidebar-* tokens, and watch detail splits into a two-column layout." }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --background: oklch(1 0 0); --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0); --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0); --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0); --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0); --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0); --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325); --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0); --input: oklch(0.922 0 0); --ring: oklch(0.708 0 0);
+  --success: oklch(0.52 0.14 152); --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.55 0.16 75); --warning-foreground: oklch(0.985 0 0);
+  --radius: 0.625rem; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --font-ui:'Geist',system-ui,-apple-system,sans-serif; --font-mono:'Geist Mono',ui-monospace,'SFMono-Regular',monospace;
+}
+.dark{
+  --background: oklch(0.145 0 0); --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0); --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0); --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0); --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0); --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216); --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 15%); --ring: oklch(0.556 0 0);
+  --success: oklch(0.72 0.16 152); --success-foreground: oklch(0.145 0 0);
+  --warning: oklch(0.79 0.15 80); --warning-foreground: oklch(0.145 0 0);
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:var(--font-ui);}
+</style>
+</helmet>
+
+<div class="{{themeClass}}" style="width:375px;min-height:1080px;background:var(--background);color:var(--foreground);display:flex;flex-direction:column;">
+
+  <div style="padding:20px 20px 14px;display:flex;flex-direction:column;gap:2px;">
+    <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.01em;">Run history</h1>
+    <div style="font-size:13px;color:var(--muted-foreground);">Every fetch &middot; render &middot; send, in order</div>
+  </div>
+
+  <div style="display:inline-flex;gap:2px;background:var(--muted);border-radius:var(--radius-lg);padding:3px;margin:0 20px 12px;width:fit-content;">
+    <div style="padding:6px 14px;border-radius:var(--radius-md);background:var(--background);box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.06);font-size:12px;font-weight:600;">All</div>
+    <div style="padding:6px 14px;border-radius:var(--radius-md);color:var(--muted-foreground);font-size:12px;font-weight:500;">Success</div>
+    <div style="padding:6px 14px;border-radius:var(--radius-md);color:var(--muted-foreground);font-size:12px;font-weight:500;">Failed</div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:8px 20px 24px;">
+
+    <!-- TODAY -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:12.5px;font-weight:500;color:var(--muted-foreground);">Today</div>
+
+      <!-- Run 1: expanded, success -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+        <div style="padding:14px 16px;display:flex;align-items:center;gap:10px;">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+            <div style="font-size:14px;font-weight:600;">BLR &rarr; GOA</div>
+            <div style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">07:00:14 &middot; 1.8s &middot; run_9f2a1c</div>
+          </div>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(90deg);"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div style="border-top:1px solid var(--border);padding:14px 16px 16px;display:flex;flex-direction:column;gap:0;">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="width:8px;height:8px;border-radius:99px;background:var(--success);"></div>
+              <div style="width:1.5px;flex:1;background:var(--border);min-height:22px;"></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex:1;padding-bottom:14px;">
+              <span style="font-size:12.5px;font-weight:500;">Fetch</span>
+              <span style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">42ms &middot; 2 providers</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="width:8px;height:8px;border-radius:99px;background:var(--success);"></div>
+              <div style="width:1.5px;flex:1;background:var(--border);min-height:22px;"></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex:1;padding-bottom:14px;">
+              <span style="font-size:12.5px;font-weight:500;">Normalize &amp; persist</span>
+              <span style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">14ms</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="width:8px;height:8px;border-radius:99px;background:var(--success);"></div>
+              <div style="width:1.5px;flex:1;background:var(--border);min-height:22px;"></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex:1;padding-bottom:14px;">
+              <span style="font-size:12.5px;font-weight:500;">Analyze</span>
+              <span style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">6ms &middot; p87</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="width:8px;height:8px;border-radius:99px;background:var(--success);"></div>
+              <div style="width:1.5px;flex:1;background:var(--border);min-height:22px;"></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex:1;padding-bottom:14px;">
+              <span style="font-size:12.5px;font-weight:500;">Render</span>
+              <span style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">180ms &middot; gemini-flash</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:8px;height:8px;border-radius:99px;background:var(--success);margin-top:2px;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex:1;">
+              <span style="font-size:12.5px;font-weight:500;">Send &middot; Telegram</span>
+              <span style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">1.2s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run 2: collapsed success -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+          <div style="font-size:14px;font-weight:600;">DEL &rarr; BOM</div>
+          <div style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">07:00:22 &middot; 0.9s</div>
+        </div>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+
+      <!-- Run 3: FAILED -->
+      <div style="background:var(--card);border:1px solid var(--border);box-shadow:0 0 0 1.5px color-mix(in oklch, var(--destructive) 40%, transparent);border-radius:var(--radius-xl);padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--destructive)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6"/><path d="M15 9l-6 6"/></svg>
+          <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+            <div style="font-size:14px;font-weight:600;">HYD &rarr; SIN</div>
+            <div style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">07:01:05 &middot; failed at Fetch &middot; run_c81e07</div>
+          </div>
+        </div>
+        <div style="background:color-mix(in oklch, var(--destructive) 12%, var(--background));border-radius:var(--radius-md);padding:8px 10px;font-size:11.5px;color:var(--destructive);font-family:var(--font-mono);">
+          provider timeout &middot; 3/3 retries exhausted &middot; consecutive_failures: 4
+        </div>
+      </div>
+    </div>
+
+    <!-- YESTERDAY -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:12.5px;font-weight:500;color:var(--muted-foreground);">Yesterday</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+          <div style="font-size:14px;font-weight:600;">Taj Exotica, Goa</div>
+          <div style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">07:00:09 &middot; 2.1s</div>
+        </div>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        <div style="flex:1;display:flex;flex-direction:column;gap:1px;">
+          <div style="font-size:14px;font-weight:600;">BLR &rarr; GOA</div>
+          <div style="font-size:11.5px;color:var(--muted-foreground);font-family:var(--font-mono);">07:00:11 &middot; 1.6s</div>
+        </div>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom tab bar -->
+  <div style="position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--border);display:flex;padding:10px 8px 14px;gap:4px;">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted-foreground);">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>
+      <span style="font-size:10.5px;font-weight:500;">Watches</span>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--foreground);">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+      <span style="font-size:10.5px;font-weight:600;">Runs</span>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted-foreground);">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><circle cx="17" cy="6" r="2"/><path d="M4 12h4"/><circle cx="11" cy="12" r="2"/><path d="M4 18h10"/><circle cx="17" cy="18" r="2"/></svg>
+      <span style="font-size:10.5px;font-weight:500;">Settings</span>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? 'dark' : '' };
+  }
+}
+</script>
+</body>
+</html>

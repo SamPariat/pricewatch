@@ -1,0 +1,62 @@
+# Secrets — never commit real credentials. .env.example is the tracked
+# template; .env holds the actual bcrypt hash, session secret, and API
+# tokens for this machine. Deliberately precise (not a bare .env*)
+# because that broader pattern would also hide .env.example itself.
+.env
+.env.local
+.env.*.local
+
+# --- Go (backend/) ---
+# No binary is checked into source control anywhere in this repo —
+# `docker build` produces /out/server inside its own build stage, and
+# local `go build ./...` doesn't write a persistent binary unless told
+# to with -o. These patterns guard against that ever happening by
+# accident.
+backend/server
+backend/cmd/server/server
+*.test
+*.out
+/backend/bin/
+
+# --- Node / Next.js (web/) ---
+# Folded in from create-next-app's own web/.gitignore rather than kept
+# as a nested file, so there's one gitignore for the whole repo.
+web/node_modules/
+web/.pnp
+web/.pnp.*
+web/.yarn/*
+!web/.yarn/patches
+!web/.yarn/plugins
+!web/.yarn/releases
+!web/.yarn/versions
+web/coverage/
+web/.next/
+web/out/
+web/build/
+web/.vercel
+web/next-env.d.ts
+*.tsbuildinfo
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Design canvas build output ---
+# design/*.dc.html and canvas.json are the tracked source; this bundled
+# HTML is generated from them via the design skill's seed script and is
+# ~2MB — regenerate rather than commit.
+design/pricewatch-design.html
+
+# --- IDE ---
+.idea/
+.vscode/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Claude Code local session state ---
+# Machine/session-local, not portable across checkouts.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

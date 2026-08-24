@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --background: oklch(1 0 0); --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0); --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0); --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0); --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0); --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0); --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325); --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0); --input: oklch(0.922 0 0); --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0); --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.97 0 0); --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --success: oklch(0.52 0.14 152); --success-foreground: oklch(0.985 0 0);
+  --radius: 0.625rem; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --font-ui:'Geist',system-ui,-apple-system,sans-serif; --font-mono:'Geist Mono',ui-monospace,'SFMono-Regular',monospace;
+}
+.dark{
+  --background: oklch(0.145 0 0); --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0); --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0); --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0); --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0); --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0); --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216); --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 15%); --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.205 0 0); --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0); --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --success: oklch(0.72 0.16 152); --success-foreground: oklch(0.145 0 0);
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:var(--font-ui);}
+</style>
+</helmet>
+
+<div class="{{themeClass}}" style="width:1280px;min-height:900px;background:var(--background);color:var(--foreground);display:flex;">
+
+  <!-- Sidebar -->
+  <div style="width:232px;flex-shrink:0;background:var(--sidebar);color:var(--sidebar-foreground);border-right:1px solid var(--sidebar-border);display:flex;flex-direction:column;padding:20px 14px;">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 8px 24px;">
+      <div style="width:30px;height:30px;border-radius:var(--radius-md);background:var(--primary);display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--primary-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2Z"/></svg>
+      </div>
+      <div style="font-size:15px;font-weight:700;letter-spacing:-0.01em;">Pricewatch</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.3"/><rect x="14" y="3" width="7" height="5" rx="1.3"/><rect x="14" y="12" width="7" height="9" rx="1.3"/><rect x="3" y="16" width="7" height="5" rx="1.3"/></svg>
+        <span style="font-size:13.5px;font-weight:500;">Dashboard</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>
+        <span style="font-size:13.5px;font-weight:500;">Watches</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+        <span style="font-size:13.5px;font-weight:500;">Runs</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);background:var(--sidebar-accent);color:var(--sidebar-accent-foreground);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10"/><circle cx="17" cy="6" r="2"/><path d="M4 12h4"/><circle cx="11" cy="12" r="2"/><path d="M4 18h10"/><circle cx="17" cy="18" r="2"/></svg>
+        <span style="font-size:13.5px;font-weight:500;">Settings</span>
+      </div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--radius-md);background:var(--sidebar-accent);">
+      <div style="width:7px;height:7px;border-radius:99px;background:var(--success);flex-shrink:0;"></div>
+      <span style="font-size:12px;font-weight:500;">Telegram connected</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1;display:flex;flex-direction:column;">
+    <div style="padding:22px 32px;border-bottom:1px solid var(--border);">
+      <h1 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.01em;">Settings</h1>
+    </div>
+
+    <div style="flex:1;display:flex;justify-content:center;padding:32px;">
+      <div style="width:640px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Telegram -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+          <div style="font-size:14px;font-weight:600;">Telegram</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--muted);border-radius:var(--radius-md);">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:7px;height:7px;border-radius:99px;background:var(--success);"></div>
+              <div>
+                <div style="font-size:13px;font-weight:500;">Weekend Trip Squad</div>
+                <div style="font-size:11.5px;color:var(--muted-foreground);">Bot: @pricewatch_bot &middot; chat_id -100482910</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--muted-foreground);font-weight:500;">Disconnect</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="padding:7px 14px;border-radius:var(--radius-md);background:var(--secondary);border:1px solid var(--border);font-size:12.5px;font-weight:500;">Send test message</div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+          <div style="font-size:14px;font-weight:600;">Notifications</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Daily digest time</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">Sent after the morning check completes</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;padding:7px 12px;background:var(--background);border:1px solid var(--input);border-radius:var(--radius-md);">7:00 AM</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Quiet hours</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">No alerts sent in this window, digest excepted</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;padding:7px 12px;background:var(--background);border:1px solid var(--input);border-radius:var(--radius-md);">10:00 PM &ndash; 6:30 AM</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Threshold alerts</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">Ping immediately when a watch crosses its threshold</div>
+            </div>
+            <div style="width:36px;height:20px;background:var(--primary);border-radius:99px;position:relative;flex-shrink:0;"><div style="position:absolute;right:2px;top:2px;width:16px;height:16px;background:var(--background);border-radius:99px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.15);"></div></div>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+          <div style="font-size:14px;font-weight:600;">Data</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:500;">Default currency</div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;padding:7px 12px;background:var(--background);border:1px solid var(--input);border-radius:var(--radius-md);">INR</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Prune raw quotes after</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">Daily rollups are kept forever regardless</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;padding:7px 12px;background:var(--background);border:1px solid var(--input);border-radius:var(--radius-md);">90 days</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Dry-run mode</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">Runs fetch and render but never sends to Telegram</div>
+            </div>
+            <div style="width:36px;height:20px;background:var(--input);border-radius:99px;position:relative;flex-shrink:0;"><div style="position:absolute;left:2px;top:2px;width:16px;height:16px;background:var(--background);border-radius:99px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.15);"></div></div>
+          </div>
+        </div>
+
+        <!-- AI -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:14px;font-weight:600;">AI copywriting <span style="font-weight:400;color:var(--muted-foreground);font-size:12px;">(optional)</span></div>
+            <div style="width:36px;height:20px;background:var(--primary);border-radius:99px;position:relative;flex-shrink:0;"><div style="position:absolute;right:2px;top:2px;width:16px;height:16px;background:var(--background);border-radius:99px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.15);"></div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:13px;font-weight:500;">Provider</div>
+              <div style="font-size:11.5px;color:var(--muted-foreground);">Falls back to plain templates if unset or unreachable</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;padding:7px 12px;background:var(--background);border:1px solid var(--input);border-radius:var(--radius-md);">Gemini 2.5 Flash</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:500;">API key</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--success);font-weight:500;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Configured
+            </div>
+          </div>
+        </div>
+
+        <!-- Account -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);">
+          <div style="font-size:14px;font-weight:600;">Account</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:500;">Admin password</div>
+            <div style="font-size:12.5px;color:var(--foreground);font-weight:500;">Change</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:500;">Active session</div>
+            <div style="font-size:12.5px;color:var(--muted-foreground);">This device &middot; since Aug 21</div>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:2px;padding-top:14px;font-size:11px;color:var(--muted-foreground);font-family:var(--font-mono);">API v1 &middot; min v1 &middot; max v1</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Sticky save bar -->
+    <div style="border-top:1px solid var(--border);background:var(--card);padding:14px 32px;display:flex;justify-content:flex-end;gap:10px;">
+      <div style="padding:8px 18px;border-radius:var(--radius-md);background:var(--secondary);border:1px solid var(--border);font-size:13px;font-weight:500;">Discard</div>
+      <div style="padding:8px 18px;border-radius:var(--radius-md);background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:500;">Save changes</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { themeClass: this.props.dark ? 'dark' : '' };
+  }
+}
+</script>
+</body>
+</html>
