@@ -187,10 +187,27 @@ func (f *FakeRepository) GetWatchState(ctx context.Context, watchID domain.Watch
 	return s, nil
 }
 
+// UpsertWatchState writes run-health fields only, preserving whatever
+// SnoozedUntil is already stored — matching Postgres.UpsertWatchState,
+// which never includes that column in its UPDATE SET clause. A naive
+// whole-struct overwrite here would silently clear an active snooze on
+// every run, a behavior real Postgres does NOT have — this fake must not
+// diverge from it.
 func (f *FakeRepository) UpsertWatchState(ctx context.Context, s domain.WatchState) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	s.SnoozedUntil = f.watchState[s.WatchID].SnoozedUntil
 	f.watchState[s.WatchID] = s
+	return nil
+}
+
+func (f *FakeRepository) SetSnooze(ctx context.Context, watchID domain.WatchID, until *time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s := f.watchState[watchID]
+	s.WatchID = watchID
+	s.SnoozedUntil = until
+	f.watchState[watchID] = s
 	return nil
 }
 

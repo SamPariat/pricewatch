@@ -24,6 +24,9 @@ type Config struct {
 	TravelpayoutsToken logging.Secret
 
 	GeminiAPIKey logging.Secret // optional — AI features disabled if empty
+	GeminiModel  string         // optional override, defaults inside the gemini adapter
+	OllamaURL    string         // optional fallback LLM — empty disables it
+	OllamaModel  string         // optional override, defaults inside the ollama adapter
 
 	AdminPasswordHash string // bcrypt hash, not a raw secret to redact-guard
 	SessionSecret     logging.Secret
@@ -55,6 +58,9 @@ func Load() (Config, error) {
 		TelegramBotToken:   logging.Secret(req("TELEGRAM_BOT_TOKEN")),
 		TravelpayoutsToken: logging.Secret(req("TRAVELPAYOUTS_TOKEN")),
 		GeminiAPIKey:       logging.Secret(os.Getenv("GEMINI_API_KEY")), // optional
+		GeminiModel:        os.Getenv("GEMINI_MODEL"),                   // optional
+		OllamaURL:          os.Getenv("OLLAMA_URL"),                     // optional
+		OllamaModel:        os.Getenv("OLLAMA_MODEL"),                   // optional
 		AdminPasswordHash:  req("ADMIN_PASSWORD_HASH"),
 		SessionSecret:      logging.Secret(req("SESSION_SECRET")),
 		AppDomain:          envOr("APP_DOMAIN", "localhost"),

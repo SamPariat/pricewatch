@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sampariat/prices-reminder/internal/ai"
 	"github.com/sampariat/prices-reminder/internal/analytics"
 	"github.com/sampariat/prices-reminder/internal/domain"
 	"github.com/sampariat/prices-reminder/internal/logging"
@@ -21,6 +22,11 @@ type Pipeline struct {
 	Registry *providers.Registry
 	Repo     domain.Repository
 	Clock    domain.Clock
+
+	// Copywriter is optional — see PLAN.md § AI features. A nil Copywriter
+	// (or one wrapping a nil domain.LLM) leaves render.Digest's output
+	// completely unchanged.
+	Copywriter *ai.Copywriter
 }
 
 // RunWatch runs the full pipeline for one watch. runID is minted by the
@@ -83,6 +89,7 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 	p.emit(ctx, runID, "analyze", domain.LevelInfo, "analysis complete", nil)
 
 	text := render.Digest(w, analysis)
+	text = p.Copywriter.Enhance(ctx, w, analysis, text)
 	p.emit(ctx, runID, "render", domain.LevelInfo, "section rendered", nil)
 
 	now := p.Clock.Now()

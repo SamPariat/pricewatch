@@ -81,9 +81,7 @@ func (cs *capturingServer) count() int {
 }
 
 func newTestNotifier(baseURL string) *Notifier {
-	n := New("test-token")
-	n.baseURL = baseURL + "/bot"
-	return n
+	return NewForTest("test-token", baseURL)
 }
 
 func TestSend_PlainMessage_HitsSendMessage(t *testing.T) {

@@ -151,6 +151,43 @@ func TestRunWatch_ConsecutiveFailuresAccumulate(t *testing.T) {
 	}
 }
 
+// TestRunWatch_PreservesSnooze guards against UpsertWatchState silently
+// clearing an active Telegram snooze on a normal run — see
+// storetest.FakeRepository.UpsertWatchState's doc comment. A regression
+// here would mean "Snooze 7d" stops working the moment the very next
+// scheduled fetch completes.
+func TestRunWatch_PreservesSnooze(t *testing.T) {
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t)
+
+	registry := providers.NewRegistry()
+	registry.Register(&fakeProvider{
+		kind: domain.AssetFlightReturn,
+		quotes: []domain.Quote{
+			{WatchID: w.ID, PriceMinor: 800000, DepartDate: "2026-12-10", ReturnDate: "2026-12-15", Fingerprint: "a"},
+		},
+	})
+
+	repo := storetest.New()
+	until := now.AddDate(0, 0, 7)
+	if err := repo.SetSnooze(context.Background(), w.ID, &until); err != nil {
+		t.Fatal(err)
+	}
+
+	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+	if _, err := p.RunWatch(context.Background(), "run-snooze", w); err != nil {
+		t.Fatalf("RunWatch: %v", err)
+	}
+
+	state, err := repo.GetWatchState(context.Background(), w.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.SnoozedUntil == nil || !state.SnoozedUntil.Equal(until) {
+		t.Errorf("SnoozedUntil = %v, want %v — a normal run must not clear it", state.SnoozedUntil, until)
+	}
+}
+
 func TestRunWatch_NoMatchingQuote_Fails(t *testing.T) {
 	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
 	w := flightWatch(t)
