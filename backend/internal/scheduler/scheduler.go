@@ -181,7 +181,13 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	}
 
 	var sections []string
+	var ranWatches []domain.Watch
 	for _, w := range ws {
+		if state, err := s.repo.GetWatchState(ctx, w.ID); err == nil && isSnoozed(state, time.Now()) {
+			logging.From(ctx).Info("scheduler: skipping snoozed watch", "watch_id", w.ID, "snoozed_until", *state.SnoozedUntil)
+			continue
+		}
+
 		runID := domain.RunID(ulid.Make().String())
 		rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(w.ID))
 		text, err := s.pipeline.RunWatch(rctx, runID, w)
@@ -190,6 +196,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 			continue
 		}
 		sections = append(sections, text)
+		ranWatches = append(ranWatches, w)
 	}
 	if len(sections) == 0 {
 		return
@@ -205,8 +212,34 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	}
 
 	msg := domain.Message{Text: render.CombineDigest(sections)}
+	// Buttons only make sense when the message is unambiguously about one
+	// watch — a batch of several watches has no single "this one" for
+	// Snooze/Pause/Refresh to act on. See PLAN.md § Telegram.
+	if len(ranWatches) == 1 {
+		msg.Buttons = snoozeButtons(ranWatches[0].ID)
+	}
 	if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
 		logging.From(ctx).Error("scheduler: send failed", "error", err)
+	}
+}
+
+// isSnoozed reports whether now falls within a watch's active snooze
+// window — see WatchState.SnoozedUntil and telegram.UpdatesListener,
+// which is what actually sets it from the "Snooze 7d" button press.
+func isSnoozed(state domain.WatchState, now time.Time) bool {
+	return state.SnoozedUntil != nil && now.Before(*state.SnoozedUntil)
+}
+
+func snoozeButtons(watchID domain.WatchID) [][]domain.Button {
+	id := string(watchID)
+	return [][]domain.Button{
+		{
+			{Label: "Snooze 7d", Callback: "snooze:" + id},
+			{Label: "Pause", Callback: "pause:" + id},
+		},
+		{
+			{Label: "Refresh now", Callback: "refresh:" + id},
+		},
 	}
 }
 

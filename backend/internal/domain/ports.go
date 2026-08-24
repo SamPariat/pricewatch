@@ -51,7 +51,12 @@ type Repository interface {
 	ListRunEvents(ctx context.Context, runID RunID) ([]RunEvent, error)
 
 	GetWatchState(ctx context.Context, watchID WatchID) (WatchState, error)
+	// UpsertWatchState writes run-health fields only (LastSuccessAt,
+	// LastAttemptAt, LastError, ConsecutiveFailures) — it never touches
+	// SnoozedUntil, so a normal scheduled run can't silently clear an
+	// active snooze. Use SetSnooze for that.
 	UpsertWatchState(ctx context.Context, s WatchState) error
+	SetSnooze(ctx context.Context, watchID WatchID, until *time.Time) error
 
 	GetSettings(ctx context.Context) (Settings, error)
 	UpdateSettings(ctx context.Context, s Settings) error

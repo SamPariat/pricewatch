@@ -18,6 +18,9 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/sampariat/prices-reminder/internal/ai"
+	"github.com/sampariat/prices-reminder/internal/ai/gemini"
+	"github.com/sampariat/prices-reminder/internal/ai/ollama"
 	"github.com/sampariat/prices-reminder/internal/cache"
 	"github.com/sampariat/prices-reminder/internal/config"
 	"github.com/sampariat/prices-reminder/internal/domain"
@@ -33,6 +36,7 @@ import (
 	"github.com/sampariat/prices-reminder/internal/providers/rental"
 	"github.com/sampariat/prices-reminder/internal/scheduler"
 	"github.com/sampariat/prices-reminder/internal/store"
+	"github.com/sampariat/prices-reminder/internal/telegrambot"
 )
 
 const sessionTTL = 7 * 24 * time.Hour
@@ -102,7 +106,10 @@ func main() {
 	registry.Register(decorate(hotellook.New(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
 	registry.Register(rental.New()) // no upstream to call yet — see PLAN.md § Known gaps and risks
 
-	pl := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: realClock{}}
+	pl := &pipeline.Pipeline{
+		Registry: registry, Repo: repo, Clock: realClock{},
+		Copywriter: buildCopywriter(cfg, ristrettoCache),
+	}
 
 	notifier := telegram.New(string(cfg.TelegramBotToken))
 
@@ -114,6 +121,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer sched.Stop()
+
+	// Long-poll listener for inline keyboard button presses (Snooze 7d /
+	// Pause / Refresh now — PLAN.md § Telegram). Runs for the process's
+	// lifetime; ctx cancellation on shutdown stops it cleanly.
+	listener := &telegrambot.Listener{Bot: notifier, Repo: repo, Sched: sched, Pipeline: pl}
+	go listener.Run(ctx)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "prices-reminder",
@@ -246,6 +259,29 @@ func (t *schedTTL) TTL(id domain.WatchID) time.Duration {
 		return 30 * time.Minute
 	}
 	return t.sched.TTL(id)
+}
+
+// buildCopywriter wires the LLM port per PLAN.md § AI features: Gemini
+// primary, Ollama fallback, both entirely optional. With neither
+// configured this returns a Copywriter around a nil domain.LLM, which
+// pipeline.Pipeline.Copywriter.Enhance treats as a no-op — the digest
+// always ships via the deterministic template either way.
+func buildCopywriter(cfg config.Config, c domain.Cache) *ai.Copywriter {
+	var primary, fallback domain.LLM
+	if cfg.OllamaURL != "" {
+		fallback = ollama.New(cfg.OllamaURL, cfg.OllamaModel)
+	}
+	if string(cfg.GeminiAPIKey) != "" {
+		primary = gemini.New(string(cfg.GeminiAPIKey), cfg.GeminiModel)
+	} else {
+		primary = fallback
+		fallback = nil
+	}
+
+	if primary == nil {
+		return &ai.Copywriter{}
+	}
+	return &ai.Copywriter{LLM: ai.WithCache(ai.Chain(primary, fallback), c)}
 }
 
 // decorate applies the resilience/caching stack described in PLAN.md

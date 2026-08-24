@@ -273,12 +273,12 @@ func (p *Postgres) ListRunEvents(ctx context.Context, runID domain.RunID) ([]dom
 
 func (p *Postgres) GetWatchState(ctx context.Context, watchID domain.WatchID) (domain.WatchState, error) {
 	row := p.pool.QueryRow(ctx, `
-		SELECT watch_id, last_success_at, last_attempt_at, last_error, consecutive_failures
+		SELECT watch_id, last_success_at, last_attempt_at, last_error, consecutive_failures, snoozed_until
 		FROM watch_state WHERE watch_id = $1`, string(watchID))
 
 	var s domain.WatchState
 	var wid string
-	err := row.Scan(&wid, &s.LastSuccessAt, &s.LastAttemptAt, &s.LastError, &s.ConsecutiveFailures)
+	err := row.Scan(&wid, &s.LastSuccessAt, &s.LastAttemptAt, &s.LastError, &s.ConsecutiveFailures, &s.SnoozedUntil)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No state yet is not an error — a watch that has never run has a
 		// zero-value state, which is exactly what the staleness badge
@@ -305,6 +305,22 @@ func (p *Postgres) UpsertWatchState(ctx context.Context, s domain.WatchState) er
 	)
 	if err != nil {
 		return fmt.Errorf("store: upsert watch state: %w", err)
+	}
+	return nil
+}
+
+// SetSnooze writes only the snoozed_until column — deliberately separate
+// from UpsertWatchState so the Telegram "Snooze 7d" button and the
+// pipeline's own run-health writes can never race or clobber each other.
+func (p *Postgres) SetSnooze(ctx context.Context, watchID domain.WatchID, until *time.Time) error {
+	_, err := p.pool.Exec(ctx, `
+		INSERT INTO watch_state (watch_id, snoozed_until)
+		VALUES ($1, $2)
+		ON CONFLICT (watch_id) DO UPDATE SET snoozed_until = EXCLUDED.snoozed_until`,
+		string(watchID), until,
+	)
+	if err != nil {
+		return fmt.Errorf("store: set snooze: %w", err)
 	}
 	return nil
 }

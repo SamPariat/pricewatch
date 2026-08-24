@@ -101,6 +101,119 @@ func TestReload_Interval_MatchesScheduleGap(t *testing.T) {
 	}
 }
 
+// recordingNotifier captures the last Message sent, so tests can assert
+// on Buttons without a real Telegram client.
+type recordingNotifier struct {
+	sent []domain.Message
+}
+
+func (n *recordingNotifier) Send(ctx context.Context, t domain.Target, m domain.Message) error {
+	n.sent = append(n.sent, m)
+	return nil
+}
+func (n *recordingNotifier) Status(ctx context.Context) (domain.NotifierStatus, error) {
+	return domain.NotifierLinked, nil
+}
+
+type succeedingProvider struct{ kind domain.AssetKind }
+
+func (p *succeedingProvider) Kind() domain.AssetKind { return p.kind }
+func (p *succeedingProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, error) {
+	return []domain.Quote{{WatchID: w.ID, PriceMinor: 800000, DepartDate: "2026-12-10", Fingerprint: "a"}}, nil
+}
+
+func TestFireGroup_SingleWatch_AttachesSnoozeButtons(t *testing.T) {
+	repo := storetest.New()
+	w := flightWatch(t, "solo", "0 7 * * *")
+	repo.SeedWatch(w)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+
+	registry := providers.NewRegistry()
+	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{time.Now()}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w})
+
+	if len(notifier.sent) != 1 {
+		t.Fatalf("got %d sends, want 1", len(notifier.sent))
+	}
+	if len(notifier.sent[0].Buttons) == 0 {
+		t.Error("expected snooze/pause/refresh buttons on a single-watch digest")
+	}
+}
+
+func TestFireGroup_MultipleWatches_NoButtons(t *testing.T) {
+	repo := storetest.New()
+	w1 := flightWatch(t, "multi1", "0 7 * * *")
+	w2 := flightWatch(t, "multi2", "0 7 * * *")
+	repo.SeedWatch(w1)
+	repo.SeedWatch(w2)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+
+	registry := providers.NewRegistry()
+	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{time.Now()}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w1, w2})
+
+	if len(notifier.sent) != 1 {
+		t.Fatalf("got %d sends, want 1", len(notifier.sent))
+	}
+	if len(notifier.sent[0].Buttons) != 0 {
+		t.Error("expected no buttons on a batched multi-watch digest — there's no single watch for them to act on")
+	}
+}
+
+func TestFireGroup_SkipsSnoozedWatch(t *testing.T) {
+	repo := storetest.New()
+	w := flightWatch(t, "snoozed", "0 7 * * *")
+	repo.SeedWatch(w)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	until := time.Now().Add(7 * 24 * time.Hour)
+	if err := repo.SetSnooze(context.Background(), w.ID, &until); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{time.Now()}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w})
+
+	if len(notifier.sent) != 0 {
+		t.Errorf("expected no send for a snoozed watch, got %d", len(notifier.sent))
+	}
+}
+
+func TestFireGroup_ExpiredSnooze_StillRuns(t *testing.T) {
+	repo := storetest.New()
+	w := flightWatch(t, "expired-snooze", "0 7 * * *")
+	repo.SeedWatch(w)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	past := time.Now().Add(-time.Hour) // snooze already lapsed
+	if err := repo.SetSnooze(context.Background(), w.ID, &past); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{time.Now()}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w})
+
+	if len(notifier.sent) != 1 {
+		t.Errorf("expected the watch to run once its snooze has lapsed, got %d sends", len(notifier.sent))
+	}
+}
+
 func TestReload_DisabledWatchIsNotScheduled(t *testing.T) {
 	repo := storetest.New()
 	w := flightWatch(t, "disabled", "*/5 * * * *")
