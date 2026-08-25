@@ -71,6 +71,13 @@ type Loader func() ([]byte, error)
 // implementations are expected to use singleflight internally.
 type Cache interface {
 	GetOrLoad(ctx context.Context, key string, ttl time.Duration, load Loader) ([]byte, error)
+	// Invalidate evicts key if present. It exists for exactly one case: a
+	// caller that explicitly asked for a fresh result (see
+	// providers.SkipCache) needs the next GetOrLoad to genuinely miss,
+	// not replay whatever — possibly empty, possibly wrong — value is
+	// already cached. It is not a general-purpose Delete; nothing else
+	// should need it.
+	Invalidate(ctx context.Context, key string) error
 }
 
 // Prompt is provider-agnostic input to an LLM adapter (gemini, ollama).

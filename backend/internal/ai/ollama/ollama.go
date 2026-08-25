@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/sampariat/prices-reminder/internal/logging"
 )
 
 type LLM struct {
@@ -58,6 +59,7 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	start := time.Now()
 	resp, err := l.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("ollama: request failed: %w", err)
@@ -68,6 +70,8 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("ollama: read response: %w", err)
 	}
+	logging.HTTPResponse(ctx, "ollama: generate", resp.StatusCode, time.Since(start), respBody)
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ollama: upstream returned %d: %s", resp.StatusCode, respBody)
 	}

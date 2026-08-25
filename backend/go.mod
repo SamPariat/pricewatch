@@ -12,6 +12,7 @@ require (
 	github.com/sony/gobreaker/v2 v2.4.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/time v0.15.0
+	gonum.org/v1/plot v0.17.0
 )
 
 require (
@@ -45,5 +46,4 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	gonum.org/v1/plot v0.17.0 // indirect
 )

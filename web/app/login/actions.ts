@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "@/lib/api";
+import { bodyPreview, logger } from "@/lib/logger";
 
 const API_URL = process.env.API_INTERNAL_URL ?? "http://app:8080";
 
@@ -17,19 +18,29 @@ export async function login(_prevState: string | null, formData: FormData): Prom
     return "Enter a password.";
   }
 
+  const start = Date.now();
   const res = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-Version": "1" },
     body: JSON.stringify({ password }),
     cache: "no-store",
   });
+  const duration_ms = Date.now() - start;
 
   if (res.status === 401) {
+    // Never log the password itself — only that an attempt was made and
+    // rejected. Repeated hits here are the signal worth having (someone
+    // guessing), which a plain "Incorrect password" toast on its own
+    // leaves no server-side trace of.
+    logger.warn("login: rejected", { status: 401, duration_ms });
     return "Incorrect password.";
   }
   if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    logger.warn("login: unexpected response", { status: res.status, duration_ms, body: bodyPreview(text) });
     return "Something went wrong — try again.";
   }
+  logger.info("login: succeeded", { duration_ms });
 
   const setCookies = res.headers.getSetCookie();
   const raw = setCookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));
@@ -51,7 +62,9 @@ export async function login(_prevState: string | null, formData: FormData): Prom
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${API_URL}/api/auth/logout`, { method: "POST", cache: "no-store" });
+  const start = Date.now();
+  const res = await fetch(`${API_URL}/api/auth/logout`, { method: "POST", cache: "no-store" });
+  logger.info("logout", { status: res.status, duration_ms: Date.now() - start });
   const store = await cookies();
   store.delete(SESSION_COOKIE);
   redirect("/login");

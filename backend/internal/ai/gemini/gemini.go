@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/sampariat/prices-reminder/internal/logging"
 )
 
 const defaultBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -26,12 +27,14 @@ type LLM struct {
 	httpClient *http.Client
 }
 
-// New builds a Gemini-backed domain.LLM. model defaults to gemini-2.5-flash
-// (PLAN.md § AI features: "1,500 req/day, no card — default, ~50x
-// headroom") when empty.
+// New builds a Gemini-backed domain.LLM. model defaults to gemini-3.6-flash
+// when empty — gemini-2.5-flash (the free-tier default named in PLAN.md §
+// AI features when this was written) was retired for new callers; verified
+// against the live API on 2026-08-24, which names gemini-3.6-flash as its
+// replacement.
 func New(apiKey, model string) *LLM {
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-3.6-flash"
 	}
 	return &LLM{apiKey: apiKey, model: model, baseURL: defaultBaseURL, httpClient: &http.Client{Timeout: 15 * time.Second}}
 }
@@ -74,6 +77,7 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	start := time.Now()
 	resp, err := l.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("gemini: request failed: %w", err)
@@ -84,6 +88,8 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("gemini: read response: %w", err)
 	}
+	logging.HTTPResponse(ctx, "gemini: generateContent", resp.StatusCode, time.Since(start), respBody)
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("gemini: upstream returned %d: %s", resp.StatusCode, respBody)
 	}

@@ -1,10 +1,15 @@
+# Everything goes to Next.js, including /api/* — the browser never talks
+# to Fiber directly (see PLAN.md § Panel: "no CORS to configure, and the
+# API credential stays server-side"). Next.js's own server-side code is
+# the only thing that calls app:8080, over the internal Docker network.
+#
+# Caddy handles TLS automatically: a real domain in APP_DOMAIN gets a
+# Let's Encrypt certificate via ACME (ports 80+443 must be reachable from
+# the internet, and DNS must already point here); "localhost" is served
+# as plain HTTP with no certificate, which is what local `docker compose
+# up` uses.
 {$APP_DOMAIN} {
-	handle /api/* {
-		reverse_proxy app:8080
-	}
-	handle {
-		reverse_proxy web:3000
-	}
+	reverse_proxy web:3000
 
 	log {
 		output stdout

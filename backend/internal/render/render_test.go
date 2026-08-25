@@ -96,6 +96,54 @@ func TestDigest_AllTimeLow_OnlyRendersWhenBelowCurrentPrice(t *testing.T) {
 	}
 }
 
+func TestDigest_NearestMatch_NotesTheShiftedDates(t *testing.T) {
+	w := flightWatch(t)
+	text := Digest(w, Analysis{
+		PriceMinor: 841200, Currency: "INR",
+		NearestMatch: DateRange{Depart: "2026-12-24", Return: "2026-12-26"},
+	})
+
+	if !strings.Contains(text, "No exact match") {
+		t.Errorf("expected a note about the fallback match, got: %q", text)
+	}
+	if !strings.Contains(text, "Dec 24") || !strings.Contains(text, "Dec 26") {
+		t.Errorf("expected the actual matched dates in the note, got: %q", text)
+	}
+}
+
+func TestDigest_ExactMatch_OmitsNearestMatchNote(t *testing.T) {
+	w := flightWatch(t)
+	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
+
+	if strings.Contains(text, "No exact match") {
+		t.Errorf("did not expect a nearest-match note for the zero value, got: %q", text)
+	}
+}
+
+func TestDigest_NearestMatch_OneWay_OmitsArrow(t *testing.T) {
+	w := flightWatch(t)
+	text := Digest(w, Analysis{
+		PriceMinor: 841200, Currency: "INR",
+		NearestMatch: DateRange{Depart: "2026-12-24"}, // no Return — one-way
+	})
+
+	var noteLine string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "No exact match") {
+			noteLine = line
+		}
+	}
+	if noteLine == "" {
+		t.Fatalf("expected a nearest-match note line, got: %q", text)
+	}
+	if !strings.Contains(noteLine, "Dec 24") {
+		t.Errorf("note line = %q, want the matched depart date", noteLine)
+	}
+	if strings.Contains(noteLine, "→") {
+		t.Errorf("note line = %q, did not expect an arrow with no return date", noteLine)
+	}
+}
+
 func TestDigest_HotelUsesLocationTitle(t *testing.T) {
 	params, err := json.Marshal(domain.HotelParams{Location: "Goa", CheckIn: "2026-12-10", CheckOut: "2026-12-15"})
 	if err != nil {

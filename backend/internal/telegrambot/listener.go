@@ -19,6 +19,7 @@ import (
 	"github.com/sampariat/prices-reminder/internal/logging"
 	"github.com/sampariat/prices-reminder/internal/notify/telegram"
 	"github.com/sampariat/prices-reminder/internal/pipeline"
+	"github.com/sampariat/prices-reminder/internal/providers"
 	"github.com/sampariat/prices-reminder/internal/render"
 	"github.com/sampariat/prices-reminder/internal/scheduler"
 )
@@ -138,6 +139,7 @@ func (l *Listener) refresh(ctx context.Context, id domain.WatchID) string {
 
 	runID := domain.RunID(ulid.Make().String())
 	rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(id))
+	rctx = providers.SkipCache(rctx)
 	text, err := l.Pipeline.RunWatch(rctx, runID, w)
 	if err != nil {
 		return "Refresh failed — check the run log in the panel."
