@@ -14,6 +14,7 @@ import (
 	"github.com/sampariat/prices-reminder/internal/domain"
 	v1 "github.com/sampariat/prices-reminder/internal/httpapi/presenter/v1"
 	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/sampariat/prices-reminder/internal/providers"
 	"github.com/sampariat/prices-reminder/internal/render"
 )
 
@@ -162,6 +163,7 @@ func (a *API) RunWatchNow(c fiber.Ctx) error {
 func (a *API) runNow(ctx context.Context, w domain.Watch, send bool) (string, error) {
 	runID := domain.RunID(ulid.Make().String())
 	rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(w.ID))
+	rctx = providers.SkipCache(rctx)
 	text, err := a.Pipeline.RunWatch(rctx, runID, w)
 	if err != nil {
 		return "", err

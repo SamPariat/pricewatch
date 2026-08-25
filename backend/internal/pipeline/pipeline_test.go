@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -188,9 +189,40 @@ func TestRunWatch_PreservesSnooze(t *testing.T) {
 	}
 }
 
+// TestRunWatch_NoMatchingQuote_Fails uses a date far enough off (about six
+// months) that even the nearest-available fallback (rollupForWatch's
+// maxDateDriftDays) rejects it — a genuine "nothing here is this trip"
+// case, distinct from TestRunWatch_NearestMatch_Succeeds below.
 func TestRunWatch_NoMatchingQuote_Fails(t *testing.T) {
 	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
 	w := flightWatch(t)
+
+	registry := providers.NewRegistry()
+	registry.Register(&fakeProvider{
+		kind: domain.AssetFlightReturn,
+		quotes: []domain.Quote{
+			{WatchID: w.ID, PriceMinor: 100, DepartDate: "2027-06-25", ReturnDate: "2027-07-01", Fingerprint: "x"},
+		},
+	})
+
+	repo := storetest.New()
+	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+
+	_, err := p.RunWatch(context.Background(), "run6", w)
+	if err == nil {
+		t.Fatal("expected an error when nothing fetched is within the drift cap of the watch's configured date")
+	}
+}
+
+// TestRunWatch_NearestMatch_Succeeds is the full RunWatch path for the
+// near-miss case the fallback exists for — a real fare exists but isn't
+// exactly the configured dates, and RunWatch must still succeed, writing
+// a digest that says so rather than silently presenting the shifted-date
+// price as the exact trip configured (see render.Digest's NearestMatch
+// note).
+func TestRunWatch_NearestMatch_Succeeds(t *testing.T) {
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t) // configured for 2026-12-10 -> 2026-12-15
 
 	registry := providers.NewRegistry()
 	registry.Register(&fakeProvider{
@@ -203,9 +235,15 @@ func TestRunWatch_NoMatchingQuote_Fails(t *testing.T) {
 	repo := storetest.New()
 	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
 
-	_, err := p.RunWatch(context.Background(), "run6", w)
-	if err == nil {
-		t.Fatal("expected an error when no fetched quote matches the watch's configured date")
+	text, err := p.RunWatch(context.Background(), "run7", w)
+	if err != nil {
+		t.Fatalf("expected the nearest-available fallback to succeed, got: %v", err)
+	}
+	if !strings.Contains(text, "No exact match") {
+		t.Errorf("expected the digest to note the fallback match, got: %q", text)
+	}
+	if !strings.Contains(text, "Dec 25") || !strings.Contains(text, "Dec 31") {
+		t.Errorf("expected the digest to show the actual matched dates, got: %q", text)
 	}
 }
 
@@ -253,9 +291,12 @@ func TestRollupForWatch_ComputesMinMedianMax(t *testing.T) {
 		{DepartDate: "2026-12-10", ReturnDate: "2026-12-15", PriceMinor: 200},
 		{DepartDate: "2026-12-11", ReturnDate: "2026-12-16", PriceMinor: 1}, // wrong date, excluded
 	}
-	sample, ok := rollupForWatch(w, quotes, now)
+	sample, match, ok := rollupForWatch(w, quotes, now)
 	if !ok {
 		t.Fatal("expected rollupForWatch to find matching quotes")
+	}
+	if !match.Exact {
+		t.Error("expected an exact match when one exists, not the nearest-available fallback")
 	}
 	if sample.MinMinor != 100 || sample.MedianMinor != 200 || sample.MaxMinor != 300 || sample.NQuotes != 3 {
 		t.Errorf("got min:%d median:%d max:%d n:%d, want min:100 median:200 max:300 n:3",
@@ -268,8 +309,77 @@ func TestRollupForWatch_ComputesMinMedianMax(t *testing.T) {
 
 func TestRollupForWatch_NoMatch(t *testing.T) {
 	w := flightWatch(t)
-	_, ok := rollupForWatch(w, []domain.Quote{{DepartDate: "2099-01-01"}}, time.Now())
+	_, _, ok := rollupForWatch(w, []domain.Quote{{DepartDate: "2099-01-01"}}, time.Now())
 	if ok {
-		t.Fatal("expected ok=false when nothing matches the watch's configured date")
+		t.Fatal("expected ok=false when nothing is within the drift cap of the watch's configured date")
+	}
+}
+
+// TestRollupForWatch_NearestMatch_WithinCap_Succeeds is the real case that
+// motivated the fallback: a DEL→GAU watch configured for Oct 31 → Nov 7
+// whose only real fare that month was Oct 17 → Nov 18 (14 days off on
+// depart, 11 on return) — previously this failed the run outright.
+func TestRollupForWatch_NearestMatch_WithinCap_Succeeds(t *testing.T) {
+	w := flightWatch(t) // configured for 2026-12-10 -> 2026-12-15
+	quotes := []domain.Quote{
+		{DepartDate: "2026-12-24", ReturnDate: "2026-12-26", PriceMinor: 500}, // 14/11 days off — within the 21-day cap
+	}
+	sample, match, ok := rollupForWatch(w, quotes, time.Now())
+	if !ok {
+		t.Fatal("expected the nearest-available fallback to succeed within the drift cap")
+	}
+	if match.Exact {
+		t.Error("expected Exact=false — this was a fallback match, not the configured dates")
+	}
+	if match.MatchedDepart != "2026-12-24" || match.MatchedReturn != "2026-12-26" {
+		t.Errorf("matched dates = %s/%s, want the fallback fare's own dates", match.MatchedDepart, match.MatchedReturn)
+	}
+	if match.ConfiguredDepart != "2026-12-10" || match.ConfiguredReturn != "2026-12-15" {
+		t.Errorf("configured dates = %s/%s, want the watch's own configured dates preserved", match.ConfiguredDepart, match.ConfiguredReturn)
+	}
+	if sample.MinMinor != 500 {
+		t.Errorf("MinMinor = %d, want 500", sample.MinMinor)
+	}
+}
+
+func TestRollupForWatch_NearestMatch_BeyondCap_Fails(t *testing.T) {
+	w := flightWatch(t) // configured for 2026-12-10 -> 2026-12-15
+	quotes := []domain.Quote{
+		{DepartDate: "2027-06-01", ReturnDate: "2027-06-08", PriceMinor: 500}, // ~6 months off — not the same trip
+	}
+	_, _, ok := rollupForWatch(w, quotes, time.Now())
+	if ok {
+		t.Fatal("expected ok=false when the closest fare is still beyond the drift cap")
+	}
+}
+
+func TestRollupForWatch_NearestMatch_PicksTheClosestAmongSeveral(t *testing.T) {
+	w := flightWatch(t) // configured for 2026-12-10 -> 2026-12-15
+	quotes := []domain.Quote{
+		{DepartDate: "2026-12-20", ReturnDate: "2026-12-25", PriceMinor: 999}, // 10 days off
+		{DepartDate: "2026-12-13", ReturnDate: "2026-12-18", PriceMinor: 700}, // 3 days off — closest
+		{DepartDate: "2026-12-24", ReturnDate: "2026-12-26", PriceMinor: 500}, // 14/11 days off
+	}
+	_, match, ok := rollupForWatch(w, quotes, time.Now())
+	if !ok {
+		t.Fatal("expected the nearest-available fallback to succeed")
+	}
+	if match.MatchedDepart != "2026-12-13" || match.MatchedReturn != "2026-12-18" {
+		t.Errorf("matched dates = %s/%s, want the closest fare (2026-12-13/2026-12-18)", match.MatchedDepart, match.MatchedReturn)
+	}
+}
+
+func TestRollupForWatch_OneWay_FallbackIgnoresReturnLeg(t *testing.T) {
+	params, _ := json.Marshal(domain.FlightParams{Origin: "BLR", Destination: "GOI", DepartDate: "2026-12-10"})
+	w := domain.Watch{Kind: domain.AssetFlightOneWay, Params: params}
+	quotes := []domain.Quote{
+		{DepartDate: "2026-12-15", ReturnDate: "", PriceMinor: 500}, // 5 days off, no return leg to compare
+	}
+	_, match, ok := rollupForWatch(w, quotes, time.Now())
+	if !ok {
+		t.Fatal("expected the nearest-available fallback to succeed for a one-way watch")
+	}
+	if match.MatchedDepart != "2026-12-15" || match.MatchedReturn != "" {
+		t.Errorf("matched dates = %s/%q, want 2026-12-15/\"\"", match.MatchedDepart, match.MatchedReturn)
 	}
 }

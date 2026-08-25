@@ -13,12 +13,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/sampariat/prices-reminder/internal/logging"
 	"github.com/sampariat/prices-reminder/internal/providers"
 )
 
@@ -104,6 +106,7 @@ func (p *Provider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, e
 		return nil, fmt.Errorf("aviasales: build request: %w", err)
 	}
 
+	start := time.Now()
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		// The token rides in the query string — never let it reach a log
@@ -112,12 +115,18 @@ func (p *Provider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, e
 	}
 	defer resp.Body.Close()
 
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("aviasales: read response: %w", err)
+	}
+	logging.HTTPResponse(ctx, "aviasales: calendar", resp.StatusCode, time.Since(start), respBody)
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("aviasales: unexpected status %d", resp.StatusCode)
 	}
 
 	var body calendarResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(respBody, &body); err != nil {
 		return nil, fmt.Errorf("aviasales: decode response: %w", err)
 	}
 	if !body.Success {

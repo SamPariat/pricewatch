@@ -13,6 +13,7 @@ package render
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sampariat/prices-reminder/internal/analytics"
 	"github.com/sampariat/prices-reminder/internal/domain"
@@ -30,6 +31,17 @@ type Analysis struct {
 	PercentileOK bool
 	AllTimeLow   analytics.AllTimeLow
 	FetchedAt    string // RFC3339 — see PLAN.md § Freshness: always the real fetch time, never "now"
+
+	// NearestMatch is set only when no fare exactly matched the watch's
+	// configured dates and the pipeline fell back to the closest real one
+	// (internal/pipeline.rollupForWatch) — Digest must say so rather than
+	// silently presenting a shifted-date price as the exact trip
+	// configured. Zero value (both fields empty) means an exact match.
+	NearestMatch DateRange
+}
+
+type DateRange struct {
+	Depart, Return string
 }
 
 // Digest renders one watch's section. It never returns an error: every
@@ -55,6 +67,13 @@ func Digest(w domain.Watch, a Analysis) string {
 	}
 	if a.AllTimeLow.OK && a.AllTimeLow.PriceMinor < a.PriceMinor {
 		fmt.Fprintf(&b, "All-time low: <code>%s</code> on %s\n", formatPrice(a.AllTimeLow.PriceMinor, a.Currency), a.AllTimeLow.Date.Format("Jan 2"))
+	}
+	if a.NearestMatch != (DateRange{}) {
+		dates := displayDate(a.NearestMatch.Depart)
+		if a.NearestMatch.Return != "" {
+			dates += " → " + displayDate(a.NearestMatch.Return)
+		}
+		fmt.Fprintf(&b, "⚠️ No exact match — nearest fare found is %s\n", dates)
 	}
 
 	return strings.TrimRight(b.String(), "\n")
@@ -117,6 +136,18 @@ func groupThousands(n int64) string {
 		return "-" + string(out)
 	}
 	return string(out)
+}
+
+// displayDate formats a YYYY-MM-DD date as "Jan 2", matching AllTimeLow's
+// date formatting above. Falls back to the raw string on a parse failure
+// rather than erroring — Digest never returns an error (see its own doc
+// comment) and this is cosmetic, not load-bearing.
+func displayDate(s string) string {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return s
+	}
+	return t.Format("Jan 2")
 }
 
 func absF(f float64) float64 {

@@ -29,6 +29,11 @@ func (c *fakeCache) GetOrLoad(ctx context.Context, key string, ttl time.Duration
 	return v, nil
 }
 
+func (c *fakeCache) Invalidate(ctx context.Context, key string) error {
+	delete(c.store, key)
+	return nil
+}
+
 func TestWithCache_RepeatedIdenticalPrompt_CallsUnderlyingOnce(t *testing.T) {
 	inner := &fakeLLM{text: "a punchy reaction"}
 	llm := WithCache(inner, newFakeCache())

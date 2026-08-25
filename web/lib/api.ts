@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { bodyPreview, logger } from "./logger";
 import type {
   AnalyticsSummary,
   ChannelStatus,
@@ -36,22 +37,39 @@ async function cookieHeader(): Promise<string | undefined> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = init?.method ?? "GET";
   const cookie = await cookieHeader();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Version": "1",
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...(init?.headers ?? {}),
-    },
-    // Every route this client calls is either mutation or freshness-
-    // sensitive; watch history is the one exception, and its own caching
-    // is Fiber's job (schedule-derived, PLAN.md § Caching) — the Next.js
-    // layer stays uncached, not a second, independent cache to keep in
-    // sync with the first.
-    cache: "no-store",
-  });
+  const start = Date.now();
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Version": "1",
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(init?.headers ?? {}),
+      },
+      // Every route this client calls is either mutation or freshness-
+      // sensitive; watch history is the one exception, and its own caching
+      // is Fiber's job (schedule-derived, PLAN.md § Caching) — the Next.js
+      // layer stays uncached, not a second, independent cache to keep in
+      // sync with the first.
+      cache: "no-store",
+    });
+  } catch (err) {
+    // fetch itself throwing means Fiber was unreachable (connection
+    // refused, DNS, timeout) — never logged anywhere without this, since
+    // there's no response to inspect.
+    logger.error("api call: request failed", {
+      method, path, duration_ms: Date.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+
+  const duration_ms = Date.now() - start;
 
   if (res.status === 401) {
     // Fiber is the sole authority on session validity — an absent,
@@ -61,12 +79,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     // the authoritative fallback for every other case (expiry, a
     // tampered cookie value, Fiber restarting with the same secret but
     // stale sessions, etc).
+    logger.info("api call: session invalid, redirecting to login", { method, path, duration_ms });
     redirect("/login");
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    // The body is what actually explains a Fiber failure — matches
+    // internal/logging.HTTPResponse's warn-level logging for third-party
+    // responses on the Go side; this is that same idea for the panel's
+    // one call out to its own backend.
+    logger.warn("api call failed", { method, path, status: res.status, duration_ms, body: bodyPreview(text) });
     throw new ApiError(res.status, text || res.statusText);
   }
+
+  logger.debug("api call", { method, path, status: res.status, duration_ms });
+
   if (res.status === 204) {
     return undefined as T;
   }

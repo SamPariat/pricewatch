@@ -47,3 +47,12 @@ func (r *Ristretto) GetOrLoad(ctx context.Context, key string, ttl time.Duration
 	r.c.SetWithTTL(key, v, int64(len(v)), ttl)
 	return v, nil
 }
+
+// Invalidate implements domain.Cache. Ristretto's Del is a best-effort,
+// eventually-applied op (it queues onto the same internal ring buffer as
+// Set) — fine here, since the only caller is a manual "run now" that's
+// about to overwrite this key with a fresh GetOrLoad anyway.
+func (r *Ristretto) Invalidate(ctx context.Context, key string) error {
+	r.c.Del(key)
+	return nil
+}

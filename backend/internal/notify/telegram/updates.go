@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/sampariat/prices-reminder/internal/logging"
 )
 
 // Update mirrors the subset of Telegram's Update object this app cares
@@ -49,14 +52,21 @@ func (n *Notifier) GetUpdates(ctx context.Context, offset int64, timeoutSeconds 
 	}
 
 	client := http.Client{Timeout: time.Duration(timeoutSeconds+10) * time.Second}
+	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("telegram: getUpdates request failed")
 	}
 	defer resp.Body.Close()
 
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("telegram: read getUpdates response: %w", err)
+	}
+	logging.HTTPResponse(ctx, "telegram: getUpdates", resp.StatusCode, time.Since(start), respBody)
+
 	var body getUpdatesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(respBody, &body); err != nil {
 		return nil, fmt.Errorf("telegram: decode getUpdates response: %w", err)
 	}
 	if !body.OK {
