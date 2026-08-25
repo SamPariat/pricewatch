@@ -1,0 +1,882 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.\nX-API-Version defaults to the oldest supported version when absent (see internal/httpapi/middleware.APIVersion) — this spec documents version 1.",
+        "title": "Pricewatch API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api",
+    "paths": {
+        "/analytics/summary": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Total/enabled/stale watch counts plus the average 7-day price delta across watches with enough history. Scoped to what's actually computable today — no figure is reported for a feature that doesn't exist yet (e.g. threshold alerts).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Dashboard KPI summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary"
+                        }
+                    },
+                    "500": {
+                        "description": "list watches",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "The only unauthenticated /api route besides /meta and the health checks. Compares against a bcrypt hash rather than a plain password (PLAN.md Prerequisites — ADMIN_PASSWORD_HASH), and always takes the same code path on failure so it doesn't distinguish \"wrong password\" from any other rejection at the network-timing level. On success, sets an httpOnly session cookie — see internal/httpapi/doc.go's CookieAuth security definition.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Log in",
+                "parameters": [
+                    {
+                        "description": "Admin password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.loginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content — session cookie set"
+                    },
+                    "400": {
+                        "description": "invalid request body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid password",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "description": "Clears the session cookie. Not itself session-protected — logging out never requires already being logged in.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Log out",
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    }
+                }
+            }
+        },
+        "/channel/status": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Backs the panel's \"Telegram connected\" indicator — calls the real Telegram getMe endpoint via the Notifier port, so a revoked or wrong bot token shows up immediately rather than only being discovered when a digest silently fails to send.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "channel"
+                ],
+                "summary": "Notifier channel status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.channelStatusResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "check channel status",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/meta": {
+            "get": {
+                "description": "Unauthenticated — the one route (besides /auth/login) a client needs to work before it has a session.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "meta"
+                ],
+                "summary": "Supported API version range",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta"
+                        }
+                    }
+                }
+            }
+        },
+        "/runs": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "The 50 most recent runs across every watch, newest first — backs the panel's run-history screen.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "runs"
+                ],
+                "summary": "List recent digest runs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "list runs",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/runs/{run_id}/events": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Per-stage log lines (fetch → normalize → persist → analyze → render → send) for one run — the debugging tool behind \"why didn't the digest arrive.\"",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "runs"
+                ],
+                "summary": "Get one run's timeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID (ULID)",
+                        "name": "run_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "list run events",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get the singleton settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                        }
+                    },
+                    "500": {
+                        "description": "get settings",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Full-replace semantics despite the PATCH verb — the panel's settings form always submits every field.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Replace the singleton settings",
+                "parameters": [
+                    {
+                        "description": "Full settings",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid request body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "update settings",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/watches": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Every watch, each enriched with its current price, freshness, and staleness state.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "List watches",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "list watches",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Enabled by default. Triggers a background backfill fetch immediately so the chart isn't empty for a week, and reloads the scheduler so it's picked up on the next cron cycle without a restart.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Create a watch",
+                "parameters": [
+                    {
+                        "description": "Watch fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.watchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid request body, or a validation error naming the bad field",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "create watch",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/watches/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Get a watch",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Watch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                        }
+                    },
+                    "404": {
+                        "description": "watch not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Delete a watch",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Watch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    },
+                    "404": {
+                        "description": "watch not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Full-replace semantics despite the PATCH verb — the panel's watch-builder form always submits every field, so there's no partial-merge case to support.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Replace a watch",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Watch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Full watch fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.watchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid request body, or a validation error naming the bad field",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "watch not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "update watch",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/watches/{id}/history": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Server-side cached for exactly as long as the watch's own schedule (see internal/httpapi.historyCache) — \"data only changes when the cron fires.\"",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Get a watch's price history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Watch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "90d",
+                        "description": "Lookback window, e.g. 30d/90d/365d",
+                        "name": "range",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History"
+                        }
+                    },
+                    "500": {
+                        "description": "list price samples",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/watches/{id}/run": {
+            "post": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Telegram, matching the scheduled path's own behavior.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "watches"
+                ],
+                "summary": "Run a watch now",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Watch ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.runNowResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "watch not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "run failed: \u003ccause\u003e",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary": {
+            "type": "object",
+            "properties": {
+                "avg_delta_7d_pct": {
+                    "type": "number"
+                },
+                "enabled_watches": {
+                    "type": "integer"
+                },
+                "stale_watches": {
+                    "type": "integer"
+                },
+                "total_watches": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "message_body": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "watch_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History": {
+            "type": "object",
+            "properties": {
+                "last_updated_at": {
+                    "type": "string"
+                },
+                "next_run": {
+                    "type": "string"
+                },
+                "samples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample"
+                    }
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta": {
+            "type": "object",
+            "properties": {
+                "max_version": {
+                    "type": "integer"
+                },
+                "min_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string"
+                },
+                "max_minor": {
+                    "type": "integer"
+                },
+                "median_minor": {
+                    "type": "integer"
+                },
+                "min_minor": {
+                    "type": "integer"
+                },
+                "n_quotes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "delta_pct": {
+                    "type": "number"
+                },
+                "percentile": {
+                    "type": "number"
+                },
+                "price_minor": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent": {
+            "type": "object",
+            "properties": {
+                "at": {
+                    "type": "string"
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "level": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "dry_run": {
+                    "type": "boolean"
+                },
+                "quiet_hours_end": {
+                    "type": "string"
+                },
+                "quiet_hours_start": {
+                    "type": "string"
+                },
+                "telegram_chat_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch": {
+            "type": "object",
+            "properties": {
+                "consecutive_failures": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "cron_expr": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_updated_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "next_run": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "price": {
+                    "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary"
+                },
+                "stale": {
+                    "type": "boolean"
+                },
+                "threshold_pct": {
+                    "type": "number"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_httpapi_handlers.channelStatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "description": "Status is domain.NotifierStatus — \"linked\" or \"disconnected\".",
+                    "type": "string",
+                    "example": "linked"
+                }
+            }
+        },
+        "internal_httpapi_handlers.loginRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_httpapi_handlers.runNowResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_httpapi_handlers.watchRequest": {
+            "type": "object",
+            "properties": {
+                "cron_expr": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "threshold_pct": {
+                    "type": "number"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "CookieAuth": {
+            "description": "httpOnly session cookie issued by POST /auth/login (see internal/httpapi/middleware.Session). Paste as \"Cookie: pw_session=\u003cvalue\u003e\" — this is the real wire format, not an approximation of the cookie mechanism.",
+            "type": "apiKey",
+            "name": "Cookie",
+            "in": "header"
+        }
+    }
+}

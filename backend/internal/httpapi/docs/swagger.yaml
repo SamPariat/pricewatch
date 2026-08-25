@@ -1,0 +1,592 @@
+basePath: /api
+definitions:
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary:
+    properties:
+      avg_delta_7d_pct:
+        type: number
+      enabled_watches:
+        type: integer
+      stale_watches:
+        type: integer
+      total_watches:
+        type: integer
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun:
+    properties:
+      error:
+        type: string
+      finished_at:
+        type: string
+      message_body:
+        type: string
+      run_id:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      watch_id:
+        type: string
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History:
+    properties:
+      last_updated_at:
+        type: string
+      next_run:
+        type: string
+      samples:
+        items:
+          $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample'
+        type: array
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta:
+    properties:
+      max_version:
+        type: integer
+      min_version:
+        type: integer
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample:
+    properties:
+      date:
+        description: YYYY-MM-DD
+        type: string
+      max_minor:
+        type: integer
+      median_minor:
+        type: integer
+      min_minor:
+        type: integer
+      n_quotes:
+        type: integer
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary:
+    properties:
+      currency:
+        type: string
+      delta_pct:
+        type: number
+      percentile:
+        type: number
+      price_minor:
+        type: integer
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent:
+    properties:
+      at:
+        type: string
+      fields:
+        items:
+          type: integer
+        type: array
+      level:
+        type: string
+      msg:
+        type: string
+      stage:
+        type: string
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings:
+    properties:
+      currency:
+        type: string
+      dry_run:
+        type: boolean
+      quiet_hours_end:
+        type: string
+      quiet_hours_start:
+        type: string
+      telegram_chat_id:
+        type: string
+    type: object
+  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch:
+    properties:
+      consecutive_failures:
+        type: integer
+      created_at:
+        type: string
+      cron_expr:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      kind:
+        type: string
+      last_error:
+        type: string
+      last_updated_at:
+        type: string
+      name:
+        type: string
+      next_run:
+        type: string
+      params:
+        items:
+          type: integer
+        type: array
+      price:
+        $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary'
+      stale:
+        type: boolean
+      threshold_pct:
+        type: number
+      timezone:
+        type: string
+    type: object
+  internal_httpapi_handlers.channelStatusResponse:
+    properties:
+      status:
+        description: Status is domain.NotifierStatus — "linked" or "disconnected".
+        example: linked
+        type: string
+    type: object
+  internal_httpapi_handlers.loginRequest:
+    properties:
+      password:
+        type: string
+    type: object
+  internal_httpapi_handlers.runNowResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  internal_httpapi_handlers.watchRequest:
+    properties:
+      cron_expr:
+        type: string
+      enabled:
+        type: boolean
+      kind:
+        type: string
+      name:
+        type: string
+      params:
+        items:
+          type: integer
+        type: array
+      threshold_pct:
+        type: number
+      timezone:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: |-
+    Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.
+    X-API-Version defaults to the oldest supported version when absent (see internal/httpapi/middleware.APIVersion) — this spec documents version 1.
+  title: Pricewatch API
+  version: "1.0"
+paths:
+  /analytics/summary:
+    get:
+      description: Total/enabled/stale watch counts plus the average 7-day price delta
+        across watches with enough history. Scoped to what's actually computable today
+        — no figure is reported for a feature that doesn't exist yet (e.g. threshold
+        alerts).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary'
+        "500":
+          description: list watches
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Dashboard KPI summary
+      tags:
+      - analytics
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: The only unauthenticated /api route besides /meta and the health
+        checks. Compares against a bcrypt hash rather than a plain password (PLAN.md
+        Prerequisites — ADMIN_PASSWORD_HASH), and always takes the same code path
+        on failure so it doesn't distinguish "wrong password" from any other rejection
+        at the network-timing level. On success, sets an httpOnly session cookie —
+        see internal/httpapi/doc.go's CookieAuth security definition.
+      parameters:
+      - description: Admin password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi_handlers.loginRequest'
+      responses:
+        "204":
+          description: no content — session cookie set
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "401":
+          description: invalid password
+          schema:
+            type: string
+      summary: Log in
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Clears the session cookie. Not itself session-protected — logging
+        out never requires already being logged in.
+      responses:
+        "204":
+          description: no content
+      summary: Log out
+      tags:
+      - auth
+  /channel/status:
+    get:
+      description: Backs the panel's "Telegram connected" indicator — calls the real
+        Telegram getMe endpoint via the Notifier port, so a revoked or wrong bot token
+        shows up immediately rather than only being discovered when a digest silently
+        fails to send.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi_handlers.channelStatusResponse'
+        "502":
+          description: check channel status
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Notifier channel status
+      tags:
+      - channel
+  /meta:
+    get:
+      description: Unauthenticated — the one route (besides /auth/login) a client
+        needs to work before it has a session.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta'
+      summary: Supported API version range
+      tags:
+      - meta
+  /runs:
+    get:
+      description: The 50 most recent runs across every watch, newest first — backs
+        the panel's run-history screen.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun'
+            type: array
+        "500":
+          description: list runs
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: List recent digest runs
+      tags:
+      - runs
+  /runs/{run_id}/events:
+    get:
+      description: Per-stage log lines (fetch → normalize → persist → analyze → render
+        → send) for one run — the debugging tool behind "why didn't the digest arrive."
+      parameters:
+      - description: Run ID (ULID)
+        in: path
+        name: run_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent'
+            type: array
+        "500":
+          description: list run events
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Get one run's timeline
+      tags:
+      - runs
+  /settings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+        "500":
+          description: get settings
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Get the singleton settings
+      tags:
+      - settings
+    patch:
+      consumes:
+      - application/json
+      description: Full-replace semantics despite the PATCH verb — the panel's settings
+        form always submits every field.
+      parameters:
+      - description: Full settings
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+        "400":
+          description: invalid request body
+          schema:
+            type: string
+        "500":
+          description: update settings
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Replace the singleton settings
+      tags:
+      - settings
+  /watches:
+    get:
+      description: Every watch, each enriched with its current price, freshness, and
+        staleness state.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+            type: array
+        "500":
+          description: list watches
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: List watches
+      tags:
+      - watches
+    post:
+      consumes:
+      - application/json
+      description: Enabled by default. Triggers a background backfill fetch immediately
+        so the chart isn't empty for a week, and reloads the scheduler so it's picked
+        up on the next cron cycle without a restart.
+      parameters:
+      - description: Watch fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi_handlers.watchRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+        "400":
+          description: invalid request body, or a validation error naming the bad
+            field
+          schema:
+            type: string
+        "500":
+          description: create watch
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Create a watch
+      tags:
+      - watches
+  /watches/{id}:
+    delete:
+      parameters:
+      - description: Watch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: watch not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Delete a watch
+      tags:
+      - watches
+    get:
+      parameters:
+      - description: Watch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+        "404":
+          description: watch not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Get a watch
+      tags:
+      - watches
+    patch:
+      consumes:
+      - application/json
+      description: Full-replace semantics despite the PATCH verb — the panel's watch-builder
+        form always submits every field, so there's no partial-merge case to support.
+      parameters:
+      - description: Watch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Full watch fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi_handlers.watchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+        "400":
+          description: invalid request body, or a validation error naming the bad
+            field
+          schema:
+            type: string
+        "404":
+          description: watch not found
+          schema:
+            type: string
+        "500":
+          description: update watch
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Replace a watch
+      tags:
+      - watches
+  /watches/{id}/history:
+    get:
+      description: Server-side cached for exactly as long as the watch's own schedule
+        (see internal/httpapi.historyCache) — "data only changes when the cron fires."
+      parameters:
+      - description: Watch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 90d
+        description: Lookback window, e.g. 30d/90d/365d
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History'
+        "500":
+          description: list price samples
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Get a watch's price history
+      tags:
+      - watches
+  /watches/{id}/run:
+    post:
+      description: Runs the pipeline immediately, outside the normal schedule, bypassing
+        the provider cache so it always fetches fresh (see providers.SkipCache). Honours
+        the global dry-run setting for whether the result actually gets sent to Telegram,
+        matching the scheduled path's own behavior.
+      parameters:
+      - description: Watch ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi_handlers.runNowResponse'
+        "404":
+          description: watch not found
+          schema:
+            type: string
+        "502":
+          description: 'run failed: <cause>'
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Run a watch now
+      tags:
+      - watches
+securityDefinitions:
+  CookieAuth:
+    description: 'httpOnly session cookie issued by POST /auth/login (see internal/httpapi/middleware.Session).
+      Paste as "Cookie: pw_session=<value>" — this is the real wire format, not an
+      approximation of the cookie mechanism.'
+    in: header
+    name: Cookie
+    type: apiKey
+swagger: "2.0"

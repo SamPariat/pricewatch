@@ -60,6 +60,11 @@ func Router(app *fiber.App, api *handlers.API) {
 	auth.Patch("/settings", api.UpdateSettings) // full-replace semantics, see UpdateSettings
 
 	auth.Get("/channel/status", api.GetChannelStatus)
+
+	// API docs — same auth as everything else here; this is an ops page,
+	// not the product surface, so it doesn't need its own access model.
+	auth.Get("/docs", api.SwaggerUI)
+	auth.Get("/docs/openapi.json", api.OpenAPISpec)
 }
 
 // historyCache serves cached watch-history responses for exactly as long
