@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/providers"
-	"github.com/sampariat/prices-reminder/internal/store/storetest"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/store/storetest"
 )
 
 type fixedClock struct{ t time.Time }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
 )
 
 type loggingProvider struct {
@@ -29,11 +29,19 @@ func (l *loggingProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Q
 
 	log := logging.From(ctx)
 	if err != nil {
-		log.Warn("provider fetch failed",
-			"provider", l.next.Kind(), "watch_id", w.ID, "duration_ms", dur.Milliseconds(), "error", err)
+		log.Warn().
+			Str("provider", string(l.next.Kind())).
+			Str("watch_id", string(w.ID)).
+			Int64("duration_ms", dur.Milliseconds()).
+			Err(err).
+			Msg("provider fetch failed")
 		return nil, err
 	}
-	log.Info("provider fetch",
-		"provider", l.next.Kind(), "watch_id", w.ID, "duration_ms", dur.Milliseconds(), "quotes", len(quotes))
+	log.Info().
+		Str("provider", string(l.next.Kind())).
+		Str("watch_id", string(w.ID)).
+		Int64("duration_ms", dur.Milliseconds()).
+		Int("quotes", len(quotes)).
+		Msg("provider fetch")
 	return quotes, nil
 }

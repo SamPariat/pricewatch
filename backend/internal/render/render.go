@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/analytics"
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/analytics"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // Analysis carries everything one watch's digest section needs — the

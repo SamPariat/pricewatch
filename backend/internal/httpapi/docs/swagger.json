@@ -1,12 +1,12 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.\nX-API-Version defaults to the oldest supported version when absent (see internal/httpapi/middleware.APIVersion) — this spec documents version 1.",
+        "description": "Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.\nVersioned by URL prefix (/api/v1/...) — see internal/httpapi/handlers.APIVersion and internal/httpapi/router.go.",
         "title": "Pricewatch API",
         "contact": {},
         "version": "1.0"
     },
-    "basePath": "/api",
+    "basePath": "/api/v1",
     "paths": {
         "/analytics/summary": {
             "get": {
@@ -133,7 +133,7 @@
                 "tags": [
                     "meta"
                 ],
-                "summary": "Supported API version range",
+                "summary": "Supported API version",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -673,11 +673,14 @@
         "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta": {
             "type": "object",
             "properties": {
-                "max_version": {
-                    "type": "integer"
+                "current_version": {
+                    "type": "string"
                 },
-                "min_version": {
-                    "type": "integer"
+                "supported_versions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

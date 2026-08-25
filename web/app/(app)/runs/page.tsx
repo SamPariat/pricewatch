@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle2, XCircle, Clock } from "lucide-react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { watchTitle } from "@/lib/format";
 import type { DigestRun, Watch } from "@/lib/types";
 

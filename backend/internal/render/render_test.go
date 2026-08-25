@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/analytics"
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/analytics"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 func flightWatch(t *testing.T) domain.Watch {

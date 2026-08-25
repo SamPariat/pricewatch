@@ -28,14 +28,21 @@ const (
 // travels in a query parameter") leaking through this path. Only the
 // upstream's response body is logged, never the request.
 func HTTPResponse(ctx context.Context, service string, statusCode int, dur time.Duration, body []byte) {
-	log := From(ctx)
+	l := From(ctx)
 	if statusCode >= 400 {
-		log.Warn(service+": upstream error response",
-			"status", statusCode, "duration_ms", dur.Milliseconds(), "body", preview(body, bodyPreviewWarn))
+		l.Warn().
+			Int("status", statusCode).
+			Int64("duration_ms", dur.Milliseconds()).
+			Str("body", preview(body, bodyPreviewWarn)).
+			Msg(service + ": upstream error response")
 		return
 	}
-	log.Debug(service+": upstream response",
-		"status", statusCode, "duration_ms", dur.Milliseconds(), "bytes", len(body), "body", preview(body, bodyPreviewDebug))
+	l.Debug().
+		Int("status", statusCode).
+		Int64("duration_ms", dur.Milliseconds()).
+		Int("bytes", len(body)).
+		Str("body", preview(body, bodyPreviewDebug)).
+		Msg(service + ": upstream response")
 }
 
 func preview(body []byte, n int) string {

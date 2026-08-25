@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sampariat/prices-reminder/internal/analytics"
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/render"
+	"github.com/SamPariat/pricewatch/internal/analytics"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/render"
 )
 
 func TestEnhance_NilLLM_ReturnsTemplateUnchanged(t *testing.T) {

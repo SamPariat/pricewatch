@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { formatPrice, watchSubtitle, watchTitle } from "@/lib/format";
 import { allTimeLow, rollingLow, rollingMedian } from "@/lib/stats";
 import { Button } from "@/components/ui/button";

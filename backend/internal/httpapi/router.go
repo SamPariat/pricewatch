@@ -1,7 +1,6 @@
 // Package httpapi wires the Fiber v3 route tree. Route registration is
-// the only thing this file does — versioning, auth, and the actual
-// handlers each live in their own package so this stays a table of what
-// maps to what.
+// the only thing this file does — auth and the actual handlers each live
+// in their own package so this stays a table of what maps to what.
 package httpapi
 
 import (
@@ -12,17 +11,16 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/etag"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/httpapi/handlers"
-	apimw "github.com/sampariat/prices-reminder/internal/httpapi/middleware"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpapi/handlers"
+	apimw "github.com/SamPariat/pricewatch/internal/httpapi/middleware"
 )
 
-// Router registers every /api route on app. Called once from main.go
-// after api's dependencies (Repo, Sched, Pipeline, Notifier, Session) are
-// all constructed.
+// Router registers every /api/{handlers.APIVersion} route on app. Called
+// once from main.go (or internal/di) after api's dependencies are all
+// constructed.
 func Router(app *fiber.App, api *handlers.API) {
-	group := app.Group("/api")
-	group.Use(apimw.APIVersion(api.MinVersion, api.MaxVersion))
+	group := app.Group("/api/" + handlers.APIVersion)
 	// Covers /auth/login too — rate-limiting login attempts is a feature,
 	// not an oversight.
 	group.Use(limiter.New(limiter.Config{Max: 120, Expiration: time.Minute}))

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // Delta is the change between the latest sample and the day before it.

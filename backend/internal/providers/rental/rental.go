@@ -11,7 +11,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 type Provider struct{}

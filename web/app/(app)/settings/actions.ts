@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import type { FormState } from "@/app/(app)/watches/actions";
 
 export async function updateSettingsAction(_prev: FormState, formData: FormData): Promise<FormState> {

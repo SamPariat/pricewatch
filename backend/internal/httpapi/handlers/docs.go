@@ -3,7 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/sampariat/prices-reminder/internal/httpapi/docs"
+	"github.com/SamPariat/pricewatch/internal/httpapi/docs"
 )
 
 // OpenAPISpec serves the generated Swagger 2.0 spec (see
@@ -31,7 +31,7 @@ const swaggerUIPage = `<!DOCTYPE html>
 	<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 	<script>
 		window.onload = () => SwaggerUIBundle({
-			url: "/api/docs/openapi.json",
+			url: "/api/` + APIVersion + `/docs/openapi.json",
 			dom_id: "#swagger-ui",
 		});
 	</script>
@@ -39,7 +39,7 @@ const swaggerUIPage = `<!DOCTYPE html>
 </html>`
 
 // SwaggerUI serves an HTML shell that renders the spec from
-// /api/docs/openapi.json via Swagger UI.
+// /api/{APIVersion}/docs/openapi.json via Swagger UI.
 func (a *API) SwaggerUI(c fiber.Ctx) error {
 	c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 	return c.SendString(swaggerUIPage)

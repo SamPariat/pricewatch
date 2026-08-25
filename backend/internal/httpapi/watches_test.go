@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	v1 "github.com/sampariat/prices-reminder/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
 )
 
 func flightWatchBody(name, cronExpr string) map[string]any {
@@ -23,22 +23,24 @@ func flightWatchBody(name, cronExpr string) map[string]any {
 	}
 }
 
-func TestMeta_ReturnsVersionBounds(t *testing.T) {
+func TestMeta_ReturnsCurrentVersion(t *testing.T) {
 	env := newTestEnv(t)
-	resp := env.do(t, http.MethodGet, "/api/meta", nil, "")
+	resp := env.do(t, http.MethodGet, apiPrefix+"/meta", nil, "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var meta v1.Meta
-	decodeJSON(t, resp, &meta)
-	if meta.MinVersion != 1 || meta.MaxVersion != 1 {
-		t.Errorf("meta = %+v, want min=1 max=1", meta)
+	meta := decodeData[v1.Meta](t, resp)
+	if meta.CurrentVersion != "v1" {
+		t.Errorf("CurrentVersion = %q, want v1", meta.CurrentVersion)
+	}
+	if len(meta.SupportedVersions) != 1 || meta.SupportedVersions[0] != "v1" {
+		t.Errorf("SupportedVersions = %v, want [v1]", meta.SupportedVersions)
 	}
 }
 
 func TestLogin_WrongPassword_Returns401(t *testing.T) {
 	env := newTestEnv(t)
-	resp := env.do(t, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, "")
+	resp := env.do(t, http.MethodPost, apiPrefix+"/auth/login", map[string]string{"password": "wrong"}, "")
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", resp.StatusCode)
 	}
@@ -54,7 +56,7 @@ func TestLogin_CorrectPassword_SetsCookie(t *testing.T) {
 
 func TestWatches_RequireAuth(t *testing.T) {
 	env := newTestEnv(t)
-	resp := env.do(t, http.MethodGet, "/api/watches", nil, "")
+	resp := env.do(t, http.MethodGet, apiPrefix+"/watches", nil, "")
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 without a session cookie", resp.StatusCode)
 	}
@@ -62,7 +64,7 @@ func TestWatches_RequireAuth(t *testing.T) {
 
 func TestWatches_InvalidCookie_Rejected(t *testing.T) {
 	env := newTestEnv(t)
-	resp := env.do(t, http.MethodGet, "/api/watches", nil, "not-a-real-token")
+	resp := env.do(t, http.MethodGet, apiPrefix+"/watches", nil, "not-a-real-token")
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 with a bogus cookie", resp.StatusCode)
 	}
@@ -72,12 +74,11 @@ func TestCreateWatch_ThenListAndGet(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("Goa trip", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Goa trip", "0 7 * * *"), cookie)
 	if createResp.StatusCode != http.StatusCreated {
 		t.Fatalf("create status = %d", createResp.StatusCode)
 	}
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	created := decodeData[v1.Watch](t, createResp)
 	if created.ID == "" {
 		t.Fatal("expected a generated ID")
 	}
@@ -85,19 +86,17 @@ func TestCreateWatch_ThenListAndGet(t *testing.T) {
 		t.Errorf("unexpected created watch: %+v", created)
 	}
 
-	listResp := env.do(t, http.MethodGet, "/api/watches", nil, cookie)
-	var list []v1.Watch
-	decodeJSON(t, listResp, &list)
+	listResp := env.do(t, http.MethodGet, apiPrefix+"/watches", nil, cookie)
+	list := decodeData[[]v1.Watch](t, listResp)
 	if len(list) != 1 {
 		t.Fatalf("got %d watches, want 1", len(list))
 	}
 
-	getResp := env.do(t, http.MethodGet, "/api/watches/"+created.ID, nil, cookie)
+	getResp := env.do(t, http.MethodGet, apiPrefix+"/watches/"+created.ID, nil, cookie)
 	if getResp.StatusCode != http.StatusOK {
 		t.Fatalf("get status = %d", getResp.StatusCode)
 	}
-	var got v1.Watch
-	decodeJSON(t, getResp, &got)
+	got := decodeData[v1.Watch](t, getResp)
 	if got.ID != created.ID {
 		t.Errorf("got ID %q, want %q", got.ID, created.ID)
 	}
@@ -114,9 +113,13 @@ func TestCreateWatch_InvalidKind_Returns400(t *testing.T) {
 
 	body := flightWatchBody("bad", "0 7 * * *")
 	body["kind"] = "not_a_real_kind"
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	env2 := decodeEnvelope(t, resp)
+	if env2.Error == nil {
+		t.Error("expected the error field to be populated on a 400")
 	}
 }
 
@@ -125,7 +128,7 @@ func TestCreateWatch_InvalidCron_Returns400(t *testing.T) {
 	cookie := env.login(t)
 
 	body := flightWatchBody("bad cron", "not a cron expression")
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
@@ -139,7 +142,7 @@ func TestCreateWatch_ParamsMismatchedToKind_Returns400(t *testing.T) {
 		"name": "bad params", "kind": "flight_return", "cron_expr": "0 7 * * *", "timezone": "UTC",
 		"params": map[string]any{"location": "Goa"}, // hotel-shaped params on a flight watch
 	}
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
@@ -149,17 +152,15 @@ func TestUpdateWatch_ChangesFields(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("Original", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Original", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
 	body := flightWatchBody("Renamed", "0 8 * * *")
-	updateResp := env.do(t, http.MethodPatch, "/api/watches/"+created.ID, body, cookie)
+	updateResp := env.do(t, http.MethodPatch, apiPrefix+"/watches/"+created.ID, body, cookie)
 	if updateResp.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d", updateResp.StatusCode)
 	}
-	var updated v1.Watch
-	decodeJSON(t, updateResp, &updated)
+	updated := decodeData[v1.Watch](t, updateResp)
 	if updated.Name != "Renamed" || updated.CronExpr != "0 8 * * *" {
 		t.Errorf("update did not apply: %+v", updated)
 	}
@@ -169,7 +170,7 @@ func TestUpdateWatch_NotFound_Returns404(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	resp := env.do(t, http.MethodPatch, "/api/watches/does-not-exist", flightWatchBody("x", "0 7 * * *"), cookie)
+	resp := env.do(t, http.MethodPatch, apiPrefix+"/watches/does-not-exist", flightWatchBody("x", "0 7 * * *"), cookie)
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
@@ -179,16 +180,15 @@ func TestDeleteWatch_ThenGet404(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("to delete", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("to delete", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
-	delResp := env.do(t, http.MethodDelete, "/api/watches/"+created.ID, nil, cookie)
+	delResp := env.do(t, http.MethodDelete, apiPrefix+"/watches/"+created.ID, nil, cookie)
 	if delResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("delete status = %d", delResp.StatusCode)
 	}
 
-	getResp := env.do(t, http.MethodGet, "/api/watches/"+created.ID, nil, cookie)
+	getResp := env.do(t, http.MethodGet, apiPrefix+"/watches/"+created.ID, nil, cookie)
 	if getResp.StatusCode != http.StatusNotFound {
 		t.Fatalf("get after delete status = %d, want 404", getResp.StatusCode)
 	}
@@ -198,11 +198,10 @@ func TestRunWatchNow_NoProviderRegistered_Returns502(t *testing.T) {
 	env := newTestEnv(t) // deliberately built with an empty provider registry
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("no provider", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("no provider", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
-	runResp := env.do(t, http.MethodPost, "/api/watches/"+created.ID+"/run", nil, cookie)
+	runResp := env.do(t, http.MethodPost, apiPrefix+"/watches/"+created.ID+"/run", nil, cookie)
 	if runResp.StatusCode != http.StatusBadGateway {
 		t.Fatalf("status = %d, want 502 when no provider is registered for the watch's kind", runResp.StatusCode)
 	}
@@ -212,9 +211,8 @@ func TestGetWatch_IncludesPriceSummary_WhenSamplesExist(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("with price", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("with price", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
 	now := time.Now().UTC()
 	env.repo.UpsertPriceSample(t.Context(), domain.PriceSample{
@@ -226,9 +224,8 @@ func TestGetWatch_IncludesPriceSummary_WhenSamplesExist(t *testing.T) {
 		MinMinor: 800000, MedianMinor: 800000, MaxMinor: 800000, NQuotes: 1, UpdatedAt: now,
 	})
 
-	getResp := env.do(t, http.MethodGet, "/api/watches/"+created.ID, nil, cookie)
-	var got v1.Watch
-	decodeJSON(t, getResp, &got)
+	getResp := env.do(t, http.MethodGet, apiPrefix+"/watches/"+created.ID, nil, cookie)
+	got := decodeData[v1.Watch](t, getResp)
 
 	if got.Price == nil {
 		t.Fatal("expected a price summary once samples exist")
@@ -257,16 +254,14 @@ func TestGetHistory_EmptyForNewWatch(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("history test", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("history test", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
-	histResp := env.do(t, http.MethodGet, "/api/watches/"+created.ID+"/history?range=30d", nil, cookie)
+	histResp := env.do(t, http.MethodGet, apiPrefix+"/watches/"+created.ID+"/history?range=30d", nil, cookie)
 	if histResp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", histResp.StatusCode)
 	}
-	var hist v1.History
-	decodeJSON(t, histResp, &hist)
+	hist := decodeData[v1.History](t, histResp)
 	if len(hist.Samples) != 0 {
 		t.Errorf("expected no samples for a brand-new watch, got %d", len(hist.Samples))
 	}

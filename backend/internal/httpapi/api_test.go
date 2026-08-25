@@ -2,10 +2,9 @@ package httpapi_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	v1 "github.com/sampariat/prices-reminder/internal/httpapi/presenter/v1"
+	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
 )
 
 func TestCreateWatch_OneWay_NoReturnDateRequired(t *testing.T) {
@@ -16,7 +15,7 @@ func TestCreateWatch_OneWay_NoReturnDateRequired(t *testing.T) {
 		"name": "one way", "kind": "flight_one_way", "cron_expr": "0 7 * * *", "timezone": "UTC",
 		"params": map[string]any{"origin": "BLR", "destination": "GOI", "depart_date": "2026-12-10"},
 	}
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (one-way watches don't need a return_date)", resp.StatusCode)
 	}
@@ -30,7 +29,7 @@ func TestCreateWatch_Return_MissingReturnDate_Returns400(t *testing.T) {
 		"name": "missing return", "kind": "flight_return", "cron_expr": "0 7 * * *", "timezone": "UTC",
 		"params": map[string]any{"origin": "BLR", "destination": "GOI", "depart_date": "2026-12-10"},
 	}
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (a return-kind watch needs a return_date)", resp.StatusCode)
 	}
@@ -44,7 +43,7 @@ func TestCreateWatch_Hotel(t *testing.T) {
 		"name": "hotel test", "kind": "hotel", "cron_expr": "0 7 * * *", "timezone": "UTC",
 		"params": map[string]any{"location": "Goa", "check_in": "2026-12-10", "check_out": "2026-12-15"},
 	}
-	resp := env.do(t, http.MethodPost, "/api/watches", body, cookie)
+	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status = %d, want 201", resp.StatusCode)
 	}
@@ -54,23 +53,21 @@ func TestSettings_GetAndUpdate(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	getResp := env.do(t, http.MethodGet, "/api/settings", nil, cookie)
-	var s v1.Settings
-	decodeJSON(t, getResp, &s)
+	getResp := env.do(t, http.MethodGet, apiPrefix+"/settings", nil, cookie)
+	s := decodeData[v1.Settings](t, getResp)
 	if s.Currency != "INR" {
 		t.Errorf("default currency = %q, want INR", s.Currency)
 	}
 
 	s.DryRun = true
 	s.TelegramChatID = "-100123456"
-	updateResp := env.do(t, http.MethodPatch, "/api/settings", s, cookie)
+	updateResp := env.do(t, http.MethodPatch, apiPrefix+"/settings", s, cookie)
 	if updateResp.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d", updateResp.StatusCode)
 	}
 
-	getResp2 := env.do(t, http.MethodGet, "/api/settings", nil, cookie)
-	var s2 v1.Settings
-	decodeJSON(t, getResp2, &s2)
+	getResp2 := env.do(t, http.MethodGet, apiPrefix+"/settings", nil, cookie)
+	s2 := decodeData[v1.Settings](t, getResp2)
 	if !s2.DryRun || s2.TelegramChatID != "-100123456" {
 		t.Errorf("settings did not persist: %+v", s2)
 	}
@@ -80,12 +77,11 @@ func TestRuns_EmptyInitially(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	resp := env.do(t, http.MethodGet, "/api/runs", nil, cookie)
+	resp := env.do(t, http.MethodGet, apiPrefix+"/runs", nil, cookie)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var runs []v1.DigestRun
-	decodeJSON(t, resp, &runs)
+	runs := decodeData[[]v1.DigestRun](t, resp)
 	if len(runs) != 0 {
 		t.Errorf("expected no runs yet, got %d", len(runs))
 	}
@@ -95,15 +91,13 @@ func TestRuns_AfterRunNow_ShowsFailedRun(t *testing.T) {
 	env := newTestEnv(t) // empty provider registry — the run will fail at fetch
 	cookie := env.login(t)
 
-	createResp := env.do(t, http.MethodPost, "/api/watches", flightWatchBody("run test", "0 7 * * *"), cookie)
-	var created v1.Watch
-	decodeJSON(t, createResp, &created)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("run test", "0 7 * * *"), cookie)
+	created := decodeData[v1.Watch](t, createResp)
 
-	env.do(t, http.MethodPost, "/api/watches/"+created.ID+"/run", nil, cookie)
+	env.do(t, http.MethodPost, apiPrefix+"/watches/"+created.ID+"/run", nil, cookie)
 
-	resp := env.do(t, http.MethodGet, "/api/runs", nil, cookie)
-	var runs []v1.DigestRun
-	decodeJSON(t, resp, &runs)
+	resp := env.do(t, http.MethodGet, apiPrefix+"/runs", nil, cookie)
+	runs := decodeData[[]v1.DigestRun](t, resp)
 	if len(runs) == 0 {
 		t.Fatal("expected at least one recorded run after POST .../run")
 	}
@@ -111,32 +105,27 @@ func TestRuns_AfterRunNow_ShowsFailedRun(t *testing.T) {
 		t.Errorf("run status = %q, want failed (no provider registered)", runs[0].Status)
 	}
 
-	eventsResp := env.do(t, http.MethodGet, "/api/runs/"+runs[0].RunID+"/events", nil, cookie)
-	var events []v1.RunEvent
-	decodeJSON(t, eventsResp, &events)
+	eventsResp := env.do(t, http.MethodGet, apiPrefix+"/runs/"+runs[0].RunID+"/events", nil, cookie)
+	events := decodeData[[]v1.RunEvent](t, eventsResp)
 	if len(events) == 0 {
 		t.Error("expected at least one run event for the failed run")
 	}
 }
 
-func TestAPIVersion_AbsentHeader_DefaultsToOldest(t *testing.T) {
+// TestOldUnversionedPrefix_404s locks down the URL-prefix versioning
+// migration: a request to the pre-migration /api/... path (no /v1) must
+// not accidentally still work, and Fiber's own unmatched-route error
+// must come back enveloped the same as every other error (see
+// envelope.ErrorHandler).
+func TestOldUnversionedPrefix_404s(t *testing.T) {
 	env := newTestEnv(t)
-	resp := env.do(t, http.MethodGet, "/api/meta", nil, "")
-	if got := resp.Header.Get("X-API-Version"); got != "1" {
-		t.Errorf("X-API-Version = %q, want 1 (the oldest supported, per PLAN.md)", got)
+	resp := env.do(t, http.MethodGet, "/api/watches", nil, "")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 for the old unversioned prefix", resp.StatusCode)
 	}
-}
-
-func TestAPIVersion_Unsupported_Returns400(t *testing.T) {
-	env := newTestEnv(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/meta", nil)
-	req.Header.Set("X-API-Version", "99")
-	resp, err := env.app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 for an out-of-range version", resp.StatusCode)
+	env2 := decodeEnvelope(t, resp)
+	if env2.StatusCode != http.StatusNotFound || env2.Error == nil {
+		t.Errorf("envelope = %+v, want a 404 envelope with a non-nil error", env2)
 	}
 }
 
@@ -144,14 +133,14 @@ func TestChannelStatus_ReturnsNotifierStatus(t *testing.T) {
 	env := newTestEnv(t) // wired with noop.New(), whose Status() returns "disconnected"
 	cookie := env.login(t)
 
-	resp := env.do(t, http.MethodGet, "/api/channel/status", nil, cookie)
+	resp := env.do(t, http.MethodGet, apiPrefix+"/channel/status", nil, cookie)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var body struct {
+	type statusBody struct {
 		Status string `json:"status"`
 	}
-	decodeJSON(t, resp, &body)
+	body := decodeData[statusBody](t, resp)
 	if body.Status != "disconnected" {
 		t.Errorf("status = %q, want disconnected (noop notifier)", body.Status)
 	}
@@ -161,12 +150,11 @@ func TestAnalyticsSummary_CountsWatches(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	env.do(t, http.MethodPost, "/api/watches", flightWatchBody("a", "0 7 * * *"), cookie)
-	env.do(t, http.MethodPost, "/api/watches", flightWatchBody("b", "0 8 * * *"), cookie)
+	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("a", "0 7 * * *"), cookie)
+	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("b", "0 8 * * *"), cookie)
 
-	resp := env.do(t, http.MethodGet, "/api/analytics/summary", nil, cookie)
-	var summary v1.AnalyticsSummary
-	decodeJSON(t, resp, &summary)
+	resp := env.do(t, http.MethodGet, apiPrefix+"/analytics/summary", nil, cookie)
+	summary := decodeData[v1.AnalyticsSummary](t, resp)
 	if summary.TotalWatches != 2 || summary.EnabledWatches != 2 {
 		t.Errorf("summary = %+v, want 2 total and 2 enabled", summary)
 	}

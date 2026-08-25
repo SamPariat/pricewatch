@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 func newTestLLM(t *testing.T, handler http.HandlerFunc) *LLM {

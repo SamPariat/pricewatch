@@ -1,4 +1,4 @@
-module github.com/sampariat/prices-reminder
+module github.com/SamPariat/pricewatch
 
 go 1.26.1
 
@@ -9,7 +9,9 @@ require (
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rs/zerolog v1.35.1
 	github.com/sony/gobreaker/v2 v2.4.0
+	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/time v0.15.0
 	gonum.org/v1/plot v0.17.0
@@ -41,7 +43,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.73.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/image v0.30.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect

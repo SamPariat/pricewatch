@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { WatchForm } from "@/components/watch-form";
 
 export default async function EditWatchPage(props: PageProps<"/watches/[id]/edit">) {

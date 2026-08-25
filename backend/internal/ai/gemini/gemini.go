@@ -10,12 +10,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
 )
 
 const defaultBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -24,7 +23,7 @@ type LLM struct {
 	apiKey     string
 	model      string
 	baseURL    string
-	httpClient *http.Client
+	httpClient *httpclient.Client
 }
 
 // New builds a Gemini-backed domain.LLM. model defaults to gemini-3.6-flash
@@ -36,7 +35,7 @@ func New(apiKey, model string) *LLM {
 	if model == "" {
 		model = "gemini-3.6-flash"
 	}
-	return &LLM{apiKey: apiKey, model: model, baseURL: defaultBaseURL, httpClient: &http.Client{Timeout: 15 * time.Second}}
+	return &LLM{apiKey: apiKey, model: model, baseURL: defaultBaseURL, httpClient: httpclient.New(15 * time.Second)}
 }
 
 type generateRequest struct {
@@ -77,21 +76,12 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	start := time.Now()
-	resp, err := l.httpClient.Do(req)
+	status, respBody, err := l.httpClient.Do(ctx, req, "gemini: generateContent")
 	if err != nil {
-		return "", fmt.Errorf("gemini: request failed: %w", err)
+		return "", err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("gemini: read response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "gemini: generateContent", resp.StatusCode, time.Since(start), respBody)
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini: upstream returned %d: %s", resp.StatusCode, respBody)
+	if status != http.StatusOK {
+		return "", fmt.Errorf("gemini: upstream returned %d: %s", status, respBody)
 	}
 
 	var out generateResponse

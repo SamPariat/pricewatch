@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 type singleflightProvider struct {

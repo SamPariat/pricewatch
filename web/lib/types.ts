@@ -86,9 +86,20 @@ export interface Settings {
   dry_run: boolean;
 }
 
+// Versioned by URL prefix (/api/v1/...) now, not header negotiation —
+// see backend/internal/httpapi/router.go.
 export interface Meta {
-  min_version: number;
-  max_version: number;
+  current_version: string;
+  supported_versions: string[];
+}
+
+// Envelope is the shape every /api/v1 response body carries now, success
+// or failure — see backend/internal/httpapi/envelope.
+export interface Envelope<T> {
+  data: T;
+  message: string;
+  error: string | null;
+  status_code: number;
 }
 
 export type ChannelStatus = "linked" | "disconnected";

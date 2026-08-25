@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, Send } from "lucide-react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { SidebarNav, BottomNav } from "@/components/nav-links";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/login/actions";

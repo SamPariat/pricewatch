@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/render"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/render"
 )
 
 // completeTimeout bounds how long one watch's digest run will wait on an
@@ -45,13 +45,13 @@ func (c *Copywriter) Enhance(ctx context.Context, w domain.Watch, a render.Analy
 
 	raw, err := c.LLM.Complete(cctx, buildPrompt(w, a))
 	if err != nil {
-		logging.From(ctx).Warn("ai: digest copywriting failed, using template", "error", err)
+		logging.From(ctx).Warn().Err(err).Msg("ai: digest copywriting failed, using template")
 		return template
 	}
 
 	line, ok := sanitize(raw)
 	if !ok {
-		logging.From(ctx).Warn("ai: rejected LLM output for digest (contained a number or was empty)")
+		logging.From(ctx).Warn().Msg("ai: rejected LLM output for digest (contained a number or was empty)")
 		return template
 	}
 

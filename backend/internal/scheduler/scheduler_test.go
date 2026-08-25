@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/notify/noop"
-	"github.com/sampariat/prices-reminder/internal/pipeline"
-	"github.com/sampariat/prices-reminder/internal/providers"
-	"github.com/sampariat/prices-reminder/internal/store/storetest"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/notify/noop"
+	"github.com/SamPariat/pricewatch/internal/pipeline"
+	"github.com/SamPariat/pricewatch/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/store/storetest"
 )
 
 type fixedClock struct{ t time.Time }

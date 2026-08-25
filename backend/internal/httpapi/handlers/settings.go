@@ -3,7 +3,8 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v3"
 
-	v1 "github.com/sampariat/prices-reminder/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
+	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
 )
 
 // GetSettings godoc
@@ -15,11 +16,11 @@ import (
 // @Failure  500  {string}  string  "get settings"
 // @Router   /settings [get]
 func (a *API) GetSettings(c fiber.Ctx) error {
-	s, err := a.Repo.GetSettings(c)
+	s, err := a.Settings.Get(c)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "get settings")
 	}
-	return c.JSON(v1.SettingsOf(s))
+	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(s), "settings")
 }
 
 // UpdateSettings godoc
@@ -39,19 +40,20 @@ func (a *API) UpdateSettings(c fiber.Ctx) error {
 	if err := c.Bind().Body(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	if err := a.Repo.UpdateSettings(c, req.ToDomain()); err != nil {
+	saved, err := a.Settings.Update(c, req.ToDomain())
+	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "update settings")
 	}
-	return c.JSON(req)
+	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(saved), "settings updated")
 }
 
 // GetMeta godoc
-// @Summary      Supported API version range
+// @Summary      Supported API version
 // @Description  Unauthenticated — the one route (besides /auth/login) a client needs to work before it has a session.
 // @Tags         meta
 // @Produce      json
 // @Success      200  {object}  v1.Meta
 // @Router       /meta [get]
 func (a *API) GetMeta(c fiber.Ctx) error {
-	return c.JSON(v1.Meta{MinVersion: a.MinVersion, MaxVersion: a.MaxVersion})
+	return envelope.Ok(c, fiber.StatusOK, v1.Meta{CurrentVersion: APIVersion, SupportedVersions: []string{APIVersion}}, "ok")
 }

@@ -10,7 +10,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 	"github.com/pressly/goose/v3"
 
-	"github.com/sampariat/prices-reminder/migrations"
+	"github.com/SamPariat/pricewatch/migrations"
 )
 
 // Migrate applies every pending goose migration embedded in the migrations
