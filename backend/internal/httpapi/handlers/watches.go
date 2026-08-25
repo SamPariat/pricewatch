@@ -33,6 +33,15 @@ type watchRequest struct {
 	ThresholdPct float64         `json:"threshold_pct"`
 }
 
+// ListWatches godoc
+// @Summary      List watches
+// @Description  Every watch, each enriched with its current price, freshness, and staleness state.
+// @Tags         watches
+// @Security     CookieAuth
+// @Produce      json
+// @Success      200  {array}   v1.Watch
+// @Failure      500  {string}  string  "list watches"
+// @Router       /watches [get]
 func (a *API) ListWatches(c fiber.Ctx) error {
 	watches, err := a.Repo.ListWatches(c)
 	if err != nil {
@@ -46,6 +55,15 @@ func (a *API) ListWatches(c fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// GetWatch godoc
+// @Summary      Get a watch
+// @Tags         watches
+// @Security     CookieAuth
+// @Produce      json
+// @Param        id   path      string  true  "Watch ID"
+// @Success      200  {object}  v1.Watch
+// @Failure      404  {string}  string  "watch not found"
+// @Router       /watches/{id} [get]
 func (a *API) GetWatch(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	w, err := a.Repo.GetWatch(c, id)
@@ -55,6 +73,18 @@ func (a *API) GetWatch(c fiber.Ctx) error {
 	return c.JSON(a.toDTO(c, w))
 }
 
+// CreateWatch godoc
+// @Summary      Create a watch
+// @Description  Enabled by default. Triggers a background backfill fetch immediately so the chart isn't empty for a week, and reloads the scheduler so it's picked up on the next cron cycle without a restart.
+// @Tags         watches
+// @Security     CookieAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      watchRequest  true  "Watch fields"
+// @Success      201   {object}  v1.Watch
+// @Failure      400   {string}  string  "invalid request body, or a validation error naming the bad field"
+// @Failure      500   {string}  string  "create watch"
+// @Router       /watches [post]
 func (a *API) CreateWatch(c fiber.Ctx) error {
 	var req watchRequest
 	if err := c.Bind().Body(&req); err != nil {
@@ -89,9 +119,20 @@ func (a *API) CreateWatch(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(a.toDTO(c, created))
 }
 
-// UpdateWatch replaces every field from the request body — the panel's
-// watch-builder form always submits the full object, so there's no
-// partial-merge ambiguity to resolve despite the route being PATCH.
+// UpdateWatch godoc
+// @Summary      Replace a watch
+// @Description  Full-replace semantics despite the PATCH verb — the panel's watch-builder form always submits every field, so there's no partial-merge case to support.
+// @Tags         watches
+// @Security     CookieAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string        true  "Watch ID"
+// @Param        body  body      watchRequest  true  "Full watch fields"
+// @Success      200   {object}  v1.Watch
+// @Failure      400   {string}  string  "invalid request body, or a validation error naming the bad field"
+// @Failure      404   {string}  string  "watch not found"
+// @Failure      500   {string}  string  "update watch"
+// @Router       /watches/{id} [patch]
 func (a *API) UpdateWatch(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	existing, err := a.Repo.GetWatch(c, id)
@@ -130,6 +171,14 @@ func (a *API) UpdateWatch(c fiber.Ctx) error {
 	return c.JSON(a.toDTO(c, saved))
 }
 
+// DeleteWatch godoc
+// @Summary  Delete a watch
+// @Tags     watches
+// @Security CookieAuth
+// @Param    id  path  string  true  "Watch ID"
+// @Success  204  "no content"
+// @Failure  404  {string}  string  "watch not found"
+// @Router   /watches/{id} [delete]
 func (a *API) DeleteWatch(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	if err := a.Repo.DeleteWatch(c, id); err != nil {
@@ -141,11 +190,21 @@ func (a *API) DeleteWatch(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// RunWatchNow runs the pipeline immediately, outside the normal schedule.
-// It always fetches and re-renders — that's the point of asking for a
-// fresh run — but honours the global dry-run setting for whether the
-// result actually gets sent to Telegram, matching the scheduled path's
-// own behavior.
+type runNowResponse struct {
+	Message string `json:"message"`
+}
+
+// RunWatchNow godoc
+// @Summary      Run a watch now
+// @Description  Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Telegram, matching the scheduled path's own behavior.
+// @Tags         watches
+// @Security     CookieAuth
+// @Produce      json
+// @Param        id   path      string  true  "Watch ID"
+// @Success      200  {object}  runNowResponse
+// @Failure      404  {string}  string  "watch not found"
+// @Failure      502  {string}  string  "run failed: <cause>"
+// @Router       /watches/{id}/run [post]
 func (a *API) RunWatchNow(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	w, err := a.Repo.GetWatch(c, id)
@@ -157,7 +216,7 @@ func (a *API) RunWatchNow(c fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadGateway, "run failed: "+err.Error())
 	}
-	return c.JSON(fiber.Map{"message": text})
+	return c.JSON(runNowResponse{Message: text})
 }
 
 func (a *API) runNow(ctx context.Context, w domain.Watch, send bool) (string, error) {
@@ -180,6 +239,17 @@ func (a *API) runNow(ctx context.Context, w domain.Watch, send bool) (string, er
 	return text, nil
 }
 
+// GetHistory godoc
+// @Summary      Get a watch's price history
+// @Description  Server-side cached for exactly as long as the watch's own schedule (see internal/httpapi.historyCache) — "data only changes when the cron fires."
+// @Tags         watches
+// @Security     CookieAuth
+// @Produce      json
+// @Param        id     path      string  true   "Watch ID"
+// @Param        range  query     string  false  "Lookback window, e.g. 30d/90d/365d"  default(90d)
+// @Success      200    {object}  v1.History
+// @Failure      500    {string}  string  "list price samples"
+// @Router       /watches/{id}/history [get]
 func (a *API) GetHistory(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	days := parseRangeDays(c.Query("range", "90d"))

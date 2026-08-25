@@ -13,11 +13,16 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// Login is the only unauthenticated /api route besides /meta and the
-// health checks. It compares against a bcrypt hash rather than a plain
-// password (PLAN.md Prerequisites — ADMIN_PASSWORD_HASH), and always
-// takes the same code path on failure so it doesn't distinguish "wrong
-// password" from any other rejection at the network-timing level.
+// Login godoc
+// @Summary      Log in
+// @Description  The only unauthenticated /api route besides /meta and the health checks. Compares against a bcrypt hash rather than a plain password (PLAN.md Prerequisites — ADMIN_PASSWORD_HASH), and always takes the same code path on failure so it doesn't distinguish "wrong password" from any other rejection at the network-timing level. On success, sets an httpOnly session cookie — see internal/httpapi/doc.go's CookieAuth security definition.
+// @Tags         auth
+// @Accept       json
+// @Param        body  body  loginRequest  true  "Admin password"
+// @Success      204   "no content — session cookie set"
+// @Failure      400   {string}  string  "invalid request body"
+// @Failure      401   {string}  string  "invalid password"
+// @Router       /auth/login [post]
 func (a *API) Login(c fiber.Ctx) error {
 	var req loginRequest
 	if err := c.Bind().Body(&req); err != nil {
@@ -41,6 +46,12 @@ func (a *API) Login(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// Logout godoc
+// @Summary  Log out
+// @Description  Clears the session cookie. Not itself session-protected — logging out never requires already being logged in.
+// @Tags     auth
+// @Success  204  "no content"
+// @Router   /auth/logout [post]
 func (a *API) Logout(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     middleware.SessionCookie,
