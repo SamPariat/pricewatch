@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 var ErrNotFound = errors.New("storetest: not found")

@@ -6,17 +6,18 @@ package config
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/rs/zerolog"
+
+	"github.com/SamPariat/pricewatch/internal/logging"
 )
 
 type Config struct {
 	Env      string // "development" | "production"
 	Port     string
-	LogLevel slog.Level
+	LogLevel zerolog.Level
 
 	DatabaseURL logging.Secret
 
@@ -32,9 +33,6 @@ type Config struct {
 	SessionSecret     logging.Secret
 
 	AppDomain string
-
-	APIVersionMin int
-	APIVersionMax int
 
 	HTTPTimeout time.Duration
 }
@@ -64,8 +62,6 @@ func Load() (Config, error) {
 		AdminPasswordHash:  req("ADMIN_PASSWORD_HASH"),
 		SessionSecret:      logging.Secret(req("SESSION_SECRET")),
 		AppDomain:          envOr("APP_DOMAIN", "localhost"),
-		APIVersionMin:      1,
-		APIVersionMax:      1,
 		HTTPTimeout:        15 * time.Second,
 	}
 
@@ -84,15 +80,15 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func parseLevel(s string) slog.Level {
+func parseLevel(s string) zerolog.Level {
 	switch s {
 	case "debug":
-		return slog.LevelDebug
+		return zerolog.DebugLevel
 	case "warn":
-		return slog.LevelWarn
+		return zerolog.WarnLevel
 	case "error":
-		return slog.LevelError
+		return zerolog.ErrorLevel
 	default:
-		return slog.LevelInfo
+		return zerolog.InfoLevel
 	}
 }

@@ -14,10 +14,10 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/pipeline"
-	"github.com/sampariat/prices-reminder/internal/render"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/pipeline"
+	"github.com/SamPariat/pricewatch/internal/render"
 )
 
 const (
@@ -176,7 +176,7 @@ func (s *Scheduler) TTL(watchID domain.WatchID) time.Duration {
 func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	settings, err := s.repo.GetSettings(ctx)
 	if err != nil {
-		logging.From(ctx).Error("scheduler: get settings", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("scheduler: get settings")
 		return
 	}
 
@@ -184,7 +184,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	var ranWatches []domain.Watch
 	for _, w := range ws {
 		if state, err := s.repo.GetWatchState(ctx, w.ID); err == nil && isSnoozed(state, time.Now()) {
-			logging.From(ctx).Info("scheduler: skipping snoozed watch", "watch_id", w.ID, "snoozed_until", *state.SnoozedUntil)
+			logging.From(ctx).Info().Str("watch_id", string(w.ID)).Time("snoozed_until", *state.SnoozedUntil).Msg("scheduler: skipping snoozed watch")
 			continue
 		}
 
@@ -192,7 +192,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(w.ID))
 		text, err := s.pipeline.RunWatch(rctx, runID, w)
 		if err != nil {
-			logging.From(rctx).Error("scheduler: run failed", "error", err)
+			logging.From(rctx).Error().Err(err).Msg("scheduler: run failed")
 			continue
 		}
 		sections = append(sections, text)
@@ -203,11 +203,11 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	}
 
 	if settings.DryRun {
-		logging.From(ctx).Info("scheduler: dry-run, digest not sent", "sections", len(sections))
+		logging.From(ctx).Info().Int("sections", len(sections)).Msg("scheduler: dry-run, digest not sent")
 		return
 	}
 	if settings.TelegramChatID == "" {
-		logging.From(ctx).Warn("scheduler: no telegram chat configured, digest not sent")
+		logging.From(ctx).Warn().Msg("scheduler: no telegram chat configured, digest not sent")
 		return
 	}
 
@@ -219,7 +219,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		msg.Buttons = snoozeButtons(ranWatches[0].ID)
 	}
 	if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
-		logging.From(ctx).Error("scheduler: send failed", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("scheduler: send failed")
 	}
 }
 
@@ -248,9 +248,24 @@ func snoozeButtons(watchID domain.WatchID) [][]domain.Button {
 type cronLogger struct{}
 
 func (cronLogger) Info(msg string, keysAndValues ...any) {
-	logging.From(context.Background()).Info(msg, keysAndValues...)
+	logging.From(context.Background()).Info().Fields(cronFields(keysAndValues)).Msg(msg)
 }
 
 func (cronLogger) Error(err error, msg string, keysAndValues ...any) {
-	logging.From(context.Background()).Error(msg, append(keysAndValues, "error", err)...)
+	logging.From(context.Background()).Error().Err(err).Fields(cronFields(keysAndValues)).Msg(msg)
+}
+
+// cronFields converts robfig/cron's alternating key/value slice (its
+// Logger interface's own shape, not one this app chose) into a map
+// zerolog's Fields() accepts.
+func cronFields(kv []any) map[string]any {
+	fields := make(map[string]any, len(kv)/2)
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, ok := kv[i].(string)
+		if !ok {
+			continue
+		}
+		fields[key] = kv[i+1]
+	}
+	return fields
 }

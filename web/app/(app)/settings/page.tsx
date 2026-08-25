@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { SettingsForm } from "@/components/settings-form";
 
 export default async function SettingsPage() {

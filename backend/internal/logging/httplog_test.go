@@ -1,115 +1,97 @@
 package logging
 
 import (
+	"bytes"
 	"context"
-	"log/slog"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
-// capturingHandler is a minimal slog.Handler that records every call for
-// assertion — good enough to check level and attributes without pulling
-// in a testing/slogtest dependency.
-type capturingHandler struct {
-	records []slog.Record
-}
-
-func (h *capturingHandler) Enabled(context.Context, slog.Level) bool { return true }
-func (h *capturingHandler) Handle(_ context.Context, r slog.Record) error {
-	h.records = append(h.records, r)
-	return nil
-}
-func (h *capturingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
-func (h *capturingHandler) WithGroup(string) slog.Handler      { return h }
-
-func (h *capturingHandler) attr(name string) (any, bool) {
-	if len(h.records) == 0 {
-		return nil, false
-	}
-	last := h.records[len(h.records)-1]
-	var val any
-	var found bool
-	last.Attrs(func(a slog.Attr) bool {
-		if a.Key == name {
-			val, found = a.Value.Any(), true
-			return false
-		}
-		return true
-	})
-	return val, found
-}
-
-func withCapture(t *testing.T) *capturingHandler {
+// captured decodes the single JSON log line a test run produced, so
+// assertions can check level/fields without depending on zerolog's exact
+// field ordering or console formatting.
+func captured(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
-	h := &capturingHandler{}
-	prev := slog.Default()
-	slog.SetDefault(slog.New(h))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	return h
+	line := strings.TrimSpace(buf.String())
+	if line == "" {
+		t.Fatal("expected a log line, got none")
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(line), &m); err != nil {
+		t.Fatalf("decode log line %q: %v", line, err)
+	}
+	return m
+}
+
+func loggerCtx(buf *bytes.Buffer) context.Context {
+	l := zerolog.New(buf).Level(zerolog.DebugLevel)
+	return context.WithValue(context.Background(), ctxKey{}, &l)
 }
 
 func TestHTTPResponse_Success_LogsAtDebug(t *testing.T) {
-	h := withCapture(t)
-	HTTPResponse(context.Background(), "aviasales: calendar", 200, 50*time.Millisecond, []byte(`{"success":true}`))
+	buf := &bytes.Buffer{}
+	ctx := loggerCtx(buf)
+	HTTPResponse(ctx, "aviasales: calendar", 200, 50*time.Millisecond, []byte(`{"success":true}`))
 
-	if len(h.records) != 1 {
-		t.Fatalf("got %d log records, want 1", len(h.records))
+	m := captured(t, buf)
+	if m["level"] != "debug" {
+		t.Errorf("level = %v, want debug", m["level"])
 	}
-	if h.records[0].Level != slog.LevelDebug {
-		t.Errorf("level = %v, want Debug", h.records[0].Level)
+	if msg, _ := m["message"].(string); !strings.Contains(msg, "aviasales: calendar") {
+		t.Errorf("message %q missing service identifier", msg)
 	}
-	if !strings.Contains(h.records[0].Message, "aviasales: calendar") {
-		t.Errorf("message %q missing service identifier", h.records[0].Message)
-	}
-	if status, _ := h.attr("status"); status != int64(200) {
-		t.Errorf("status attr = %v, want 200", status)
+	if status, _ := m["status"].(float64); status != 200 {
+		t.Errorf("status field = %v, want 200", m["status"])
 	}
 }
 
 func TestHTTPResponse_ErrorStatus_LogsAtWarn(t *testing.T) {
-	h := withCapture(t)
-	HTTPResponse(context.Background(), "gemini: generateContent", 404, 10*time.Millisecond, []byte(`{"error":"not found"}`))
+	buf := &bytes.Buffer{}
+	ctx := loggerCtx(buf)
+	HTTPResponse(ctx, "gemini: generateContent", 404, 10*time.Millisecond, []byte(`{"error":"not found"}`))
 
-	if len(h.records) != 1 {
-		t.Fatalf("got %d log records, want 1", len(h.records))
+	m := captured(t, buf)
+	if m["level"] != "warn" {
+		t.Errorf("level = %v, want warn", m["level"])
 	}
-	if h.records[0].Level != slog.LevelWarn {
-		t.Errorf("level = %v, want Warn", h.records[0].Level)
+	if msg, _ := m["message"].(string); !strings.Contains(msg, "upstream error response") {
+		t.Errorf("message %q missing error framing", msg)
 	}
-	if !strings.Contains(h.records[0].Message, "upstream error response") {
-		t.Errorf("message %q missing error framing", h.records[0].Message)
-	}
-	body, _ := h.attr("body")
-	if body != `{"error":"not found"}` {
-		t.Errorf("body attr = %q, want the full error body", body)
+	if body, _ := m["body"].(string); body != `{"error":"not found"}` {
+		t.Errorf("body field = %q, want the full error body", body)
 	}
 }
 
 func TestHTTPResponse_ShortBody_NotTruncated(t *testing.T) {
-	h := withCapture(t)
-	HTTPResponse(context.Background(), "ollama: generate", 200, time.Millisecond, []byte("short"))
+	buf := &bytes.Buffer{}
+	ctx := loggerCtx(buf)
+	HTTPResponse(ctx, "ollama: generate", 200, time.Millisecond, []byte("short"))
 
-	body, _ := h.attr("body")
-	if body != "short" {
-		t.Errorf("body attr = %q, want %q unmodified", body, "short")
+	m := captured(t, buf)
+	if body, _ := m["body"].(string); body != "short" {
+		t.Errorf("body field = %q, want %q unmodified", body, "short")
 	}
 }
 
 func TestHTTPResponse_LongBody_TruncatedWithMarker(t *testing.T) {
-	h := withCapture(t)
+	buf := &bytes.Buffer{}
+	ctx := loggerCtx(buf)
 	long := strings.Repeat("x", bodyPreviewWarn+100)
-	HTTPResponse(context.Background(), "telegram: sendMessage", 500, time.Millisecond, []byte(long))
+	HTTPResponse(ctx, "telegram: sendMessage", 500, time.Millisecond, []byte(long))
 
-	body, _ := h.attr("body")
-	s, ok := body.(string)
+	m := captured(t, buf)
+	body, ok := m["body"].(string)
 	if !ok {
-		t.Fatalf("body attr is %T, want string", body)
+		t.Fatalf("body field is %T, want string", m["body"])
 	}
-	if !strings.HasSuffix(s, "...(truncated)") {
-		t.Errorf("body attr = %q, want it to end with the truncation marker", s)
+	if !strings.HasSuffix(body, "...(truncated)") {
+		t.Errorf("body field = %q, want it to end with the truncation marker", body)
 	}
-	if len(s) != bodyPreviewWarn+len("...(truncated)") {
-		t.Errorf("truncated body length = %d, want exactly %d chars of body plus the marker", len(s), bodyPreviewWarn)
+	if len(body) != bodyPreviewWarn+len("...(truncated)") {
+		t.Errorf("truncated body length = %d, want exactly %d chars of body plus the marker", len(body), bodyPreviewWarn)
 	}
 }

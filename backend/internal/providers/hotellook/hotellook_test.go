@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 func fixtureServer(t *testing.T, path string) *httptest.Server {

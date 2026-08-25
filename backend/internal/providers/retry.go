@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 type retryProvider struct {

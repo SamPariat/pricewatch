@@ -1,6 +1,6 @@
 package v1
 
-import "github.com/sampariat/prices-reminder/internal/domain"
+import "github.com/SamPariat/pricewatch/internal/domain"
 
 type Settings struct {
 	TelegramChatID  string `json:"telegram_chat_id"`
@@ -24,9 +24,12 @@ func (s Settings) ToDomain() domain.Settings {
 	}
 }
 
+// Meta reports which API version this server currently speaks, at the
+// URL prefix (/api/v1/...) rather than the header-negotiated scheme this
+// replaced — see PLAN.md § API versioning and internal/httpapi/router.go.
 type Meta struct {
-	MinVersion int `json:"min_version"`
-	MaxVersion int `json:"max_version"`
+	CurrentVersion    string   `json:"current_version"`
+	SupportedVersions []string `json:"supported_versions"`
 }
 
 // AnalyticsSummary backs GET /api/analytics/summary — the dashboard KPI

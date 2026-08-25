@@ -9,8 +9,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
 )
 
 type chain struct {
@@ -34,7 +34,7 @@ func (c *chain) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	if c.fallback == nil {
 		return "", err
 	}
-	logging.From(ctx).Warn("ai: primary LLM failed, trying fallback", "error", err)
+	logging.From(ctx).Warn().Err(err).Msg("ai: primary LLM failed, trying fallback")
 
 	text, ferr := c.fallback.Complete(ctx, p)
 	if ferr != nil {

@@ -10,18 +10,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
 )
 
 type LLM struct {
 	baseURL    string
 	model      string
-	httpClient *http.Client
+	httpClient *httpclient.Client
 }
 
 // New builds an Ollama-backed domain.LLM against baseURL (e.g.
@@ -32,7 +31,7 @@ func New(baseURL, model string) *LLM {
 	if model == "" {
 		model = "llama3.2"
 	}
-	return &LLM{baseURL: baseURL, model: model, httpClient: &http.Client{Timeout: 30 * time.Second}}
+	return &LLM{baseURL: baseURL, model: model, httpClient: httpclient.New(30 * time.Second)}
 }
 
 type generateRequest struct {
@@ -59,21 +58,12 @@ func (l *LLM) Complete(ctx context.Context, p domain.Prompt) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	start := time.Now()
-	resp, err := l.httpClient.Do(req)
+	status, respBody, err := l.httpClient.Do(ctx, req, "ollama: generate")
 	if err != nil {
-		return "", fmt.Errorf("ollama: request failed: %w", err)
+		return "", err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("ollama: read response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "ollama: generate", resp.StatusCode, time.Since(start), respBody)
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ollama: upstream returned %d: %s", resp.StatusCode, respBody)
+	if status != http.StatusOK {
+		return "", fmt.Errorf("ollama: upstream returned %d: %s", status, respBody)
 	}
 
 	var out generateResponse

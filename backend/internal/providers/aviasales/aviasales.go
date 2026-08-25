@@ -13,15 +13,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
+	"github.com/SamPariat/pricewatch/internal/providers"
 )
 
 const defaultBaseURL = "https://api.travelpayouts.com/v1/prices/calendar"
@@ -31,7 +30,7 @@ type Provider struct {
 	currency   string
 	kind       domain.AssetKind
 	baseURL    string
-	httpClient *http.Client
+	httpClient *httpclient.Client
 }
 
 // NewOneWay and NewReturn share every field except Kind and whether the
@@ -50,7 +49,7 @@ func newProvider(token, currency string, kind domain.AssetKind) *Provider {
 		currency:   currency,
 		kind:       kind,
 		baseURL:    defaultBaseURL,
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		httpClient: httpclient.New(15 * time.Second),
 	}
 }
 
@@ -106,23 +105,14 @@ func (p *Provider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, e
 		return nil, fmt.Errorf("aviasales: build request: %w", err)
 	}
 
-	start := time.Now()
-	resp, err := p.httpClient.Do(req)
+	// The token rides in the query string — httpclient.Do only ever logs
+	// the response, never the request, so it never reaches a log line.
+	status, respBody, err := p.httpClient.Do(ctx, req, "aviasales: calendar")
 	if err != nil {
-		// The token rides in the query string — never let it reach a log
-		// line via the request URL.
-		return nil, fmt.Errorf("aviasales: request failed: %w", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("aviasales: read response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "aviasales: calendar", resp.StatusCode, time.Since(start), respBody)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("aviasales: unexpected status %d", resp.StatusCode)
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("aviasales: unexpected status %d", status)
 	}
 
 	var body calendarResponse

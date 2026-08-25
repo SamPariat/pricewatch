@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plane, BedDouble, Plus } from "lucide-react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import { formatPrice, watchSubtitle, watchTitle } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

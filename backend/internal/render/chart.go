@@ -9,7 +9,7 @@ import (
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // Chart renders a watch's price history to a PNG for Telegram's sendPhoto

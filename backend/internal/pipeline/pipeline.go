@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/ai"
-	"github.com/sampariat/prices-reminder/internal/analytics"
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/providers"
-	"github.com/sampariat/prices-reminder/internal/render"
+	"github.com/SamPariat/pricewatch/internal/ai"
+	"github.com/SamPariat/pricewatch/internal/analytics"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/render"
 )
 
 type Pipeline struct {
@@ -104,12 +104,12 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 	if err := p.Repo.UpsertWatchState(ctx, domain.WatchState{
 		WatchID: w.ID, LastSuccessAt: &now, LastAttemptAt: &now, LastError: "", ConsecutiveFailures: 0,
 	}); err != nil {
-		logging.From(ctx).Error("pipeline: upsert watch state after success", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("pipeline: upsert watch state after success")
 	}
 	if err := p.Repo.FinishDigestRun(ctx, domain.DigestRun{
 		RunID: runID, WatchID: w.ID, FinishedAt: &now, Status: domain.RunSuccess, MessageBody: text,
 	}); err != nil {
-		logging.From(ctx).Error("pipeline: finish digest run after success", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("pipeline: finish digest run after success")
 	}
 
 	return text, nil
@@ -131,13 +131,13 @@ func (p *Pipeline) fail(ctx context.Context, runID domain.RunID, w domain.Watch,
 	state.LastError = cause.Error()
 	state.ConsecutiveFailures++
 	if err := p.Repo.UpsertWatchState(ctx, state); err != nil {
-		logging.From(ctx).Error("pipeline: upsert watch state after failure", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("pipeline: upsert watch state after failure")
 	}
 
 	if err := p.Repo.FinishDigestRun(ctx, domain.DigestRun{
 		RunID: runID, WatchID: w.ID, FinishedAt: &now, Status: domain.RunFailed, Error: cause.Error(),
 	}); err != nil {
-		logging.From(ctx).Error("pipeline: finish digest run after failure", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("pipeline: finish digest run after failure")
 	}
 
 	return fmt.Errorf("pipeline: watch %s: stage %s: %w", w.ID, stage, cause)
@@ -147,19 +147,19 @@ func (p *Pipeline) emit(ctx context.Context, runID domain.RunID, stage string, l
 	if err := p.Repo.InsertRunEvent(ctx, domain.RunEvent{
 		RunID: runID, At: p.Clock.Now(), Stage: stage, Level: level, Msg: msg, Fields: fields,
 	}); err != nil {
-		logging.From(ctx).Error("pipeline: insert run event", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("pipeline: insert run event")
 	}
 
 	log := logging.From(ctx)
 	switch level {
 	case domain.LevelError:
-		log.Error(msg, "stage", stage)
+		log.Error().Str("stage", stage).Msg(msg)
 	case domain.LevelWarn:
-		log.Warn(msg, "stage", stage)
+		log.Warn().Str("stage", stage).Msg(msg)
 	case domain.LevelDebug:
-		log.Debug(msg, "stage", stage)
+		log.Debug().Str("stage", stage).Msg(msg)
 	default:
-		log.Info(msg, "stage", stage)
+		log.Info().Str("stage", stage).Msg(msg)
 	}
 }
 

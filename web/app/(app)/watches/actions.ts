@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { api } from "@/lib/api";
+import { api } from "@/lib/container";
 import type { AssetKind, FlightParams, HotelParams, WatchInput } from "@/lib/types";
 
 function watchInputFromForm(formData: FormData): WatchInput {

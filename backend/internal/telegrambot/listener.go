@@ -3,34 +3,31 @@
 // action. It's a driving adapter — same category as internal/httpapi/
 // handlers, just triggered by Telegram's getUpdates instead of an HTTP
 // request — which is why it depends on concrete types (Repository,
-// *scheduler.Scheduler, *pipeline.Pipeline, *telegram.Notifier) directly
-// rather than only on ports: only internal/domain itself has to stay
-// pure. See PLAN.md § Architecture patterns.
+// *scheduler.Scheduler, *service.WatchService, *telegram.Notifier)
+// directly rather than only on ports: only internal/domain itself has to
+// stay pure. See PLAN.md § Architecture patterns.
 package telegrambot
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
-	"github.com/oklog/ulid/v2"
-
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/notify/telegram"
-	"github.com/sampariat/prices-reminder/internal/pipeline"
-	"github.com/sampariat/prices-reminder/internal/providers"
-	"github.com/sampariat/prices-reminder/internal/render"
-	"github.com/sampariat/prices-reminder/internal/scheduler"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/notify/telegram"
+	"github.com/SamPariat/pricewatch/internal/scheduler"
+	"github.com/SamPariat/pricewatch/internal/service"
 )
 
 const snoozeDuration = 7 * 24 * time.Hour
 
 type Listener struct {
-	Bot      *telegram.Notifier
-	Repo     domain.Repository
-	Sched    *scheduler.Scheduler
-	Pipeline *pipeline.Pipeline
+	Bot     *telegram.Notifier
+	Repo    domain.Repository
+	Sched   *scheduler.Scheduler
+	Watches *service.WatchService
 }
 
 // Run polls forever until ctx is canceled, meant to run as its own
@@ -49,7 +46,7 @@ func (l *Listener) Run(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			logging.From(ctx).Warn("telegrambot: getUpdates failed", "error", err)
+			logging.From(ctx).Warn().Err(err).Msg("telegrambot: getUpdates failed")
 			select {
 			case <-ctx.Done():
 				return
@@ -86,7 +83,7 @@ func (l *Listener) handleCallback(ctx context.Context, cb telegram.CallbackQuery
 	}
 
 	if err := l.Bot.AnswerCallbackQuery(ctx, cb.ID, confirmText); err != nil {
-		logging.From(ctx).Warn("telegrambot: answerCallbackQuery failed", "error", err)
+		logging.From(ctx).Warn().Err(err).Msg("telegrambot: answerCallbackQuery failed")
 	}
 }
 
@@ -104,7 +101,7 @@ func parseCallback(data string) (action, watchID string, ok bool) {
 func (l *Listener) snooze(ctx context.Context, id domain.WatchID) string {
 	until := time.Now().Add(snoozeDuration)
 	if err := l.Repo.SetSnooze(ctx, id, &until); err != nil {
-		logging.From(ctx).Error("telegrambot: snooze failed", "watch_id", id, "error", err)
+		logging.From(ctx).Error().Str("watch_id", string(id)).Err(err).Msg("telegrambot: snooze failed")
 		return "Failed to snooze — try again from the panel."
 	}
 	return "Snoozed for 7 days."
@@ -117,40 +114,26 @@ func (l *Listener) pause(ctx context.Context, id domain.WatchID) string {
 	}
 	w.Enabled = false
 	if _, err := l.Repo.UpdateWatch(ctx, w); err != nil {
-		logging.From(ctx).Error("telegrambot: pause failed", "watch_id", id, "error", err)
+		logging.From(ctx).Error().Str("watch_id", string(id)).Err(err).Msg("telegrambot: pause failed")
 		return "Failed to pause — try again from the panel."
 	}
 	if err := l.Sched.Reload(ctx); err != nil {
-		logging.From(ctx).Error("telegrambot: reload after pause", "error", err)
+		logging.From(ctx).Error().Err(err).Msg("telegrambot: reload after pause")
 	}
 	return "Paused. Re-enable it from the panel when you're ready."
 }
 
-// refresh mirrors handlers.RunWatchNow's shape (mint a run ID, run the
-// pipeline, send unless dry-run) but isn't the same function — this
-// fires from a Telegram callback, not an authenticated HTTP request, and
-// the two call sites don't share enough surrounding context to be worth
-// merging into one shared helper for ~10 lines.
+// refresh delegates entirely to WatchService.RunNow — the same method
+// the HTTP "Run now" button calls (internal/httpapi/handlers.RunWatchNow)
+// — so this button and that one can never drift in behavior. Before the
+// service layer existed, this method duplicated RunNow's mint-runID /
+// SkipCache / RunWatch / Send sequence by hand.
 func (l *Listener) refresh(ctx context.Context, id domain.WatchID) string {
-	w, err := l.Repo.GetWatch(ctx, id)
-	if err != nil {
-		return "Watch not found."
-	}
-
-	runID := domain.RunID(ulid.Make().String())
-	rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(id))
-	rctx = providers.SkipCache(rctx)
-	text, err := l.Pipeline.RunWatch(rctx, runID, w)
-	if err != nil {
-		return "Refresh failed — check the run log in the panel."
-	}
-
-	settings, err := l.Repo.GetSettings(ctx)
-	if err == nil && !settings.DryRun && settings.TelegramChatID != "" {
-		msg := domain.Message{Text: render.CombineDigest([]string{text})}
-		if err := l.Bot.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
-			logging.From(rctx).Warn("telegrambot: refresh send failed", "error", err)
+	if _, err := l.Watches.RunNow(ctx, id, true); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return "Watch not found."
 		}
+		return "Refresh failed — check the run log in the panel."
 	}
 	return "Refreshed."
 }

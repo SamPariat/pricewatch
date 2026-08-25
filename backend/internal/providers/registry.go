@@ -7,7 +7,7 @@ package providers
 import (
 	"fmt"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // Registry looks up a Provider by the AssetKind it serves. Adding a new

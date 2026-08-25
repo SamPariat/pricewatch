@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
 )
 
 type skipCacheKey struct{}
@@ -54,7 +54,7 @@ func (c *cacheProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quo
 
 	if skipCache(ctx) {
 		if err := c.cache.Invalidate(ctx, key); err != nil {
-			logging.From(ctx).Warn("provider cache: invalidate for forced refresh", "key", key, "error", err)
+			logging.From(ctx).Warn().Str("key", key).Err(err).Msg("provider cache: invalidate for forced refresh")
 		}
 	}
 
@@ -70,7 +70,7 @@ func (c *cacheProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quo
 	if err != nil {
 		return nil, err
 	}
-	logging.From(ctx).Debug("provider cache", "key", key, "ttl", ttl, "hit", !missed)
+	logging.From(ctx).Debug().Str("key", key).Dur("ttl", ttl).Bool("hit", !missed).Msg("provider cache")
 
 	var quotes []domain.Quote
 	if err := json.Unmarshal(raw, &quotes); err != nil {

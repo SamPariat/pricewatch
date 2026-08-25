@@ -1,6 +1,10 @@
 package handlers
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/gofiber/fiber/v3"
+
+	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
+)
 
 type channelStatusResponse struct {
 	// Status is domain.NotifierStatus — "linked" or "disconnected".
@@ -17,9 +21,9 @@ type channelStatusResponse struct {
 // @Failure      502  {string}  string  "check channel status"
 // @Router       /channel/status [get]
 func (a *API) GetChannelStatus(c fiber.Ctx) error {
-	status, err := a.Notifier.Status(c)
+	status, err := a.Channel.Status(c)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadGateway, "check channel status")
 	}
-	return c.JSON(channelStatusResponse{Status: string(status)})
+	return envelope.Ok(c, fiber.StatusOK, channelStatusResponse{Status: string(status)}, "channel status")
 }

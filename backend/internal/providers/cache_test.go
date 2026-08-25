@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // fakeCache is a minimal in-memory domain.Cache that also counts misses,

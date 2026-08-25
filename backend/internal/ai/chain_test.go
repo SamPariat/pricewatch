@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 type fakeLLM struct {

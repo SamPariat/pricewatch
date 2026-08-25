@@ -14,15 +14,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
-	"github.com/sampariat/prices-reminder/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
+	"github.com/SamPariat/pricewatch/internal/providers"
 )
 
 const defaultBaseURL = "https://engine.hotellook.com/api/v2/cache.json"
@@ -32,7 +31,7 @@ type Provider struct {
 	currency   string
 	limit      int
 	baseURL    string
-	httpClient *http.Client
+	httpClient *httpclient.Client
 }
 
 func New(token, currency string) *Provider {
@@ -41,7 +40,7 @@ func New(token, currency string) *Provider {
 		currency:   currency,
 		limit:      20,
 		baseURL:    defaultBaseURL,
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		httpClient: httpclient.New(15 * time.Second),
 	}
 }
 
@@ -74,21 +73,12 @@ func (p *Provider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, e
 		return nil, fmt.Errorf("hotellook: build request: %w", err)
 	}
 
-	start := time.Now()
-	resp, err := p.httpClient.Do(req)
+	status, respBody, err := p.httpClient.Do(ctx, req, "hotellook: cache.json")
 	if err != nil {
-		return nil, fmt.Errorf("hotellook: request failed: %w", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("hotellook: read response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "hotellook: cache.json", resp.StatusCode, time.Since(start), respBody)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("hotellook: unexpected status %d", resp.StatusCode)
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("hotellook: unexpected status %d", status)
 	}
 
 	var results []hotelResult

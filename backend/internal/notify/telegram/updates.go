@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
 )
 
 // Update mirrors the subset of Telegram's Update object this app cares
@@ -51,19 +50,14 @@ func (n *Notifier) GetUpdates(ctx context.Context, offset int64, timeoutSeconds 
 		return nil, fmt.Errorf("telegram: build getUpdates request")
 	}
 
-	client := http.Client{Timeout: time.Duration(timeoutSeconds+10) * time.Second}
-	start := time.Now()
-	resp, err := client.Do(req)
+	// A fresh client with its own longer timeout — this is a 30s
+	// long-poll, distinct from the Notifier's own shared client, whose
+	// fixed timeout would abort it early.
+	client := httpclient.New(time.Duration(timeoutSeconds+10) * time.Second)
+	_, respBody, err := client.Do(ctx, req, "telegram: getUpdates")
 	if err != nil {
-		return nil, fmt.Errorf("telegram: getUpdates request failed")
+		return nil, err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("telegram: read getUpdates response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "telegram: getUpdates", resp.StatusCode, time.Since(start), respBody)
 
 	var body getUpdatesResponse
 	if err := json.Unmarshal(respBody, &body); err != nil {

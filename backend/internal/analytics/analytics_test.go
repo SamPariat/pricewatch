@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 var base = time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)

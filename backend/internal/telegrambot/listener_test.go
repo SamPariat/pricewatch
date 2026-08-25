@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/notify/telegram"
-	"github.com/sampariat/prices-reminder/internal/pipeline"
-	"github.com/sampariat/prices-reminder/internal/providers"
-	"github.com/sampariat/prices-reminder/internal/scheduler"
-	"github.com/sampariat/prices-reminder/internal/store/storetest"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/notify/telegram"
+	"github.com/SamPariat/pricewatch/internal/pipeline"
+	"github.com/SamPariat/pricewatch/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/scheduler"
+	"github.com/SamPariat/pricewatch/internal/service"
+	"github.com/SamPariat/pricewatch/internal/store/storetest"
 )
 
 type fixedClock struct{ t time.Time }
@@ -54,7 +55,9 @@ func newTestListener(t *testing.T, repo *storetest.FakeRepository) *Listener {
 	t.Cleanup(srv.Close)
 	bot := telegram.NewForTest("test-token", srv.URL)
 
-	return &Listener{Bot: bot, Repo: repo, Sched: sched, Pipeline: pl}
+	watches := &service.WatchService{Repo: repo, Sched: sched, Pipeline: pl, Notifier: bot, Clock: fixedClock{time.Now()}}
+
+	return &Listener{Bot: bot, Repo: repo, Sched: sched, Watches: watches}
 }
 
 func TestParseCallback(t *testing.T) {

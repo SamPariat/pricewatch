@@ -1,8 +1,8 @@
 // @title                       Pricewatch API
 // @version                     1.0
 // @description                 Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.
-// @description                 X-API-Version defaults to the oldest supported version when absent (see internal/httpapi/middleware.APIVersion) — this spec documents version 1.
-// @BasePath                    /api
+// @description                 Versioned by URL prefix (/api/v1/...) — see internal/httpapi/handlers.APIVersion and internal/httpapi/router.go.
+// @BasePath                    /api/v1
 // @securityDefinitions.apikey  CookieAuth
 // @in                          header
 // @name                        Cookie

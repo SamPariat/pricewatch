@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
 // capturingServer records every request it receives so tests can assert

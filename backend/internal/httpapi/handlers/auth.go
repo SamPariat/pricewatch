@@ -4,9 +4,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"golang.org/x/crypto/bcrypt"
 
-	"github.com/sampariat/prices-reminder/internal/httpapi/middleware"
+	"github.com/SamPariat/pricewatch/internal/httpapi/middleware"
 )
 
 type loginRequest struct {
@@ -29,25 +28,25 @@ func (a *API) Login(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
 
-	if bcrypt.CompareHashAndPassword([]byte(a.AdminHash), []byte(req.Password)) != nil {
+	token, ttl, ok := a.Auth.Login(req.Password)
+	if !ok {
 		return fiber.NewError(fiber.StatusUnauthorized, "invalid password")
 	}
 
-	token := a.Session.Issue(a.SessionTTL)
 	c.Cookie(&fiber.Cookie{
 		Name:     middleware.SessionCookie,
 		Value:    token,
 		HTTPOnly: true,
 		Secure:   secureCookies(c),
 		SameSite: fiber.CookieSameSiteLaxMode,
-		Expires:  time.Now().Add(a.SessionTTL),
+		Expires:  time.Now().Add(ttl),
 		Path:     "/",
 	})
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // Logout godoc
-// @Summary  Log out
+// @Summary      Log out
 // @Description  Clears the session cookie. Not itself session-protected — logging out never requires already being logged in.
 // @Tags     auth
 // @Success  204  "no content"

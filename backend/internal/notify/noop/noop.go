@@ -5,9 +5,9 @@ package noop
 
 import (
 	"context"
-	"log/slog"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/logging"
 )
 
 type Notifier struct{}
@@ -15,7 +15,10 @@ type Notifier struct{}
 func New() *Notifier { return &Notifier{} }
 
 func (n *Notifier) Send(ctx context.Context, t domain.Target, m domain.Message) error {
-	slog.InfoContext(ctx, "noop notifier: message not sent", "chars", len(m.Text), "buttons", len(m.Buttons))
+	logging.From(ctx).Info().
+		Int("chars", len(m.Text)).
+		Int("buttons", len(m.Buttons)).
+		Msg("noop notifier: message not sent")
 	return nil
 }
 

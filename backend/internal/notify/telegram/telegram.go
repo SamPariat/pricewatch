@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sampariat/prices-reminder/internal/domain"
-	"github.com/sampariat/prices-reminder/internal/logging"
+	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/httpclient"
 )
 
 const (
@@ -32,14 +32,14 @@ const (
 type Notifier struct {
 	token      string
 	baseURL    string
-	httpClient *http.Client
+	httpClient *httpclient.Client
 }
 
 func New(token string) *Notifier {
 	return &Notifier{
 		token:      token,
 		baseURL:    defaultBaseURL,
-		httpClient: &http.Client{Timeout: 20 * time.Second},
+		httpClient: httpclient.New(20 * time.Second),
 	}
 }
 
@@ -164,18 +164,10 @@ func (n *Notifier) Status(ctx context.Context) (domain.NotifierStatus, error) {
 		// the same discipline applied in call() below.
 		return domain.NotifierDisconnected, fmt.Errorf("telegram: build status request")
 	}
-	start := time.Now()
-	resp, err := n.httpClient.Do(req)
+	_, respBody, err := n.httpClient.Do(ctx, req, "telegram: getMe")
 	if err != nil {
 		return domain.NotifierDisconnected, nil // network trouble is "disconnected," not a caller error
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return domain.NotifierDisconnected, nil
-	}
-	logging.HTTPResponse(ctx, "telegram: getMe", resp.StatusCode, time.Since(start), respBody)
 
 	var body apiResponse
 	if err := json.Unmarshal(respBody, &body); err != nil || !body.OK {
@@ -191,20 +183,12 @@ func (n *Notifier) call(ctx context.Context, method, contentType string, body io
 	}
 	req.Header.Set("Content-Type", contentType)
 
-	start := time.Now()
-	resp, err := n.httpClient.Do(req)
+	// The bot token is part of the URL path — httpclient.Do never
+	// propagates the raw network error, so it never leaks the URL.
+	_, respBody, err := n.httpClient.Do(ctx, req, "telegram: "+method)
 	if err != nil {
-		// The bot token is part of the URL path — never let this error,
-		// or any logging of it, include the request URL.
-		return fmt.Errorf("request failed")
+		return err
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-	logging.HTTPResponse(ctx, "telegram: "+method, resp.StatusCode, time.Since(start), respBody)
 
 	var out apiResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
