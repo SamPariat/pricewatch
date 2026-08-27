@@ -58,12 +58,15 @@ func TestRunWatch_Success(t *testing.T) {
 	repo := storetest.New()
 	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
 
-	text, err := p.RunWatch(context.Background(), "run1", w)
+	res, err := p.RunWatch(context.Background(), "run1", w)
 	if err != nil {
 		t.Fatalf("RunWatch: %v", err)
 	}
-	if text == "" {
+	if res.Text == "" {
 		t.Fatal("expected non-empty rendered text")
+	}
+	if res.ThresholdBreach {
+		t.Error("expected no threshold breach — watch has no ThresholdPct configured")
 	}
 
 	samples, err := repo.ListPriceSamples(context.Background(), w.ID, now.AddDate(0, 0, -1))
@@ -235,15 +238,118 @@ func TestRunWatch_NearestMatch_Succeeds(t *testing.T) {
 	repo := storetest.New()
 	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
 
-	text, err := p.RunWatch(context.Background(), "run7", w)
+	res, err := p.RunWatch(context.Background(), "run7", w)
 	if err != nil {
 		t.Fatalf("expected the nearest-available fallback to succeed, got: %v", err)
 	}
-	if !strings.Contains(text, "No exact match") {
-		t.Errorf("expected the digest to note the fallback match, got: %q", text)
+	if !strings.Contains(res.Text, "No exact match") {
+		t.Errorf("expected the digest to note the fallback match, got: %q", res.Text)
 	}
-	if !strings.Contains(text, "Dec 25") || !strings.Contains(text, "Dec 31") {
-		t.Errorf("expected the digest to show the actual matched dates, got: %q", text)
+	if !strings.Contains(res.Text, "Dec 25") || !strings.Contains(res.Text, "Dec 31") {
+		t.Errorf("expected the digest to show the actual matched dates, got: %q", res.Text)
+	}
+}
+
+// TestRunWatch_ThresholdBreach_PriceDropMeetsThreshold seeds yesterday's
+// price sample directly (bypassing a second RunWatch call, which would
+// also need its own quotes) so DeltaVsYesterday has a real prior day to
+// compare against — see analytics.DeltaVsYesterday's own doc comment on
+// why Delta.OK is false without one.
+func TestRunWatch_ThresholdBreach_PriceDropMeetsThreshold(t *testing.T) {
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t)
+	w.ThresholdPct = 10 // alert on a 10%+ drop
+
+	repo := storetest.New()
+	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
+		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&fakeProvider{
+		kind: domain.AssetFlightReturn,
+		quotes: []domain.Quote{
+			// A 50% drop from yesterday's 1000000 — comfortably past the 10% threshold.
+			{WatchID: w.ID, PriceMinor: 500000, Currency: "INR", DepartDate: "2026-12-10", ReturnDate: "2026-12-15", Fingerprint: "a"},
+		},
+	})
+	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+
+	res, err := p.RunWatch(context.Background(), "run-breach", w)
+	if err != nil {
+		t.Fatalf("RunWatch: %v", err)
+	}
+	if !res.ThresholdBreach {
+		t.Error("expected ThresholdBreach=true for a 50% drop against a 10% threshold")
+	}
+}
+
+// TestRunWatch_ThresholdBreach_DropBelowThreshold_NoBreach is the same
+// setup with a drop that doesn't clear the configured threshold.
+func TestRunWatch_ThresholdBreach_DropBelowThreshold_NoBreach(t *testing.T) {
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t)
+	w.ThresholdPct = 50
+
+	repo := storetest.New()
+	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
+		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&fakeProvider{
+		kind: domain.AssetFlightReturn,
+		quotes: []domain.Quote{
+			// A 10% drop — real, but short of the 50% threshold configured.
+			{WatchID: w.ID, PriceMinor: 900000, Currency: "INR", DepartDate: "2026-12-10", ReturnDate: "2026-12-15", Fingerprint: "a"},
+		},
+	})
+	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+
+	res, err := p.RunWatch(context.Background(), "run-no-breach", w)
+	if err != nil {
+		t.Fatalf("RunWatch: %v", err)
+	}
+	if res.ThresholdBreach {
+		t.Error("expected ThresholdBreach=false — a 10% drop should not clear a 50% threshold")
+	}
+}
+
+// TestRunWatch_ThresholdBreach_PriceRise_NoBreach guards the sign
+// convention: a price going up must never count as a breach, even past
+// the configured percentage.
+func TestRunWatch_ThresholdBreach_PriceRise_NoBreach(t *testing.T) {
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t)
+	w.ThresholdPct = 10
+
+	repo := storetest.New()
+	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
+		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 500000, MinMinor: 500000, MaxMinor: 500000, NQuotes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&fakeProvider{
+		kind: domain.AssetFlightReturn,
+		quotes: []domain.Quote{
+			// A 100% price rise from yesterday.
+			{WatchID: w.ID, PriceMinor: 1000000, Currency: "INR", DepartDate: "2026-12-10", ReturnDate: "2026-12-15", Fingerprint: "a"},
+		},
+	})
+	p := &Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+
+	res, err := p.RunWatch(context.Background(), "run-rise", w)
+	if err != nil {
+		t.Fatalf("RunWatch: %v", err)
+	}
+	if res.ThresholdBreach {
+		t.Error("expected ThresholdBreach=false — a price rise is not a threshold breach")
 	}
 }
 

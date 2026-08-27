@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/SamPariat/pricewatch/internal/httpapi/middleware"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 type loginRequest struct {
@@ -23,14 +24,15 @@ type loginRequest struct {
 // @Failure      401   {string}  string  "invalid password"
 // @Router       /auth/login [post]
 func (a *API) Login(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	var req loginRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+		return fiber.NewError(fiber.StatusBadRequest, i18n.T(loc, "common.invalid_body"))
 	}
 
 	token, ttl, ok := a.Auth.Login(req.Password)
 	if !ok {
-		return fiber.NewError(fiber.StatusUnauthorized, "invalid password")
+		return fiber.NewError(fiber.StatusUnauthorized, i18n.T(loc, "auth.invalid_password"))
 	}
 
 	c.Cookie(&fiber.Cookie{

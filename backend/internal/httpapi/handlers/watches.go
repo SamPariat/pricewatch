@@ -10,6 +10,7 @@ import (
 	"github.com/SamPariat/pricewatch/internal/domain"
 	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/service"
 )
 
@@ -44,15 +45,16 @@ func detailToDTO(d service.Detail) v1.Watch {
 // @Failure      500  {string}  string  "list watches"
 // @Router       /watches [get]
 func (a *API) ListWatches(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	details, err := a.Watches.List(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "list watches")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "watches.list_failed"))
 	}
 	out := make([]v1.Watch, len(details))
 	for i, d := range details {
 		out[i] = detailToDTO(d)
 	}
-	return envelope.Ok(c, fiber.StatusOK, out, "watches listed")
+	return envelope.Ok(c, fiber.StatusOK, out, i18n.T(loc, "watches.listed"))
 }
 
 // GetWatch godoc
@@ -65,12 +67,13 @@ func (a *API) ListWatches(c fiber.Ctx) error {
 // @Failure      404  {string}  string  "watch not found"
 // @Router       /watches/{id} [get]
 func (a *API) GetWatch(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	id := domain.WatchID(c.Params("id"))
 	d, err := a.Watches.Get(c, id)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "watch not found")
+		return fiber.NewError(fiber.StatusNotFound, i18n.T(loc, "watches.not_found"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, detailToDTO(d), "watch found")
+	return envelope.Ok(c, fiber.StatusOK, detailToDTO(d), i18n.T(loc, "watches.found"))
 }
 
 // CreateWatch godoc
@@ -86,9 +89,10 @@ func (a *API) GetWatch(c fiber.Ctx) error {
 // @Failure      500   {string}  string  "create watch"
 // @Router       /watches [post]
 func (a *API) CreateWatch(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	var req watchRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+		return fiber.NewError(fiber.StatusBadRequest, i18n.T(loc, "common.invalid_body"))
 	}
 
 	d, err := a.Watches.Create(c, req.toInput())
@@ -97,9 +101,9 @@ func (a *API) CreateWatch(c fiber.Ctx) error {
 		if errors.As(err, &ve) {
 			return fiber.NewError(fiber.StatusBadRequest, ve.Error())
 		}
-		return fiber.NewError(fiber.StatusInternalServerError, "create watch")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "watches.create_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusCreated, detailToDTO(d), "watch created")
+	return envelope.Ok(c, fiber.StatusCreated, detailToDTO(d), i18n.T(loc, "watches.created"))
 }
 
 // UpdateWatch godoc
@@ -117,26 +121,27 @@ func (a *API) CreateWatch(c fiber.Ctx) error {
 // @Failure      500   {string}  string  "update watch"
 // @Router       /watches/{id} [patch]
 func (a *API) UpdateWatch(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	id := domain.WatchID(c.Params("id"))
 	var req watchRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+		return fiber.NewError(fiber.StatusBadRequest, i18n.T(loc, "common.invalid_body"))
 	}
 
 	d, err := a.Watches.Update(c, id, req.toInput())
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "watch not found")
+			return fiber.NewError(fiber.StatusNotFound, i18n.T(loc, "watches.not_found"))
 		default:
 			var ve service.ValidationError
 			if errors.As(err, &ve) {
 				return fiber.NewError(fiber.StatusBadRequest, ve.Error())
 			}
-			return fiber.NewError(fiber.StatusInternalServerError, "update watch")
+			return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "watches.update_failed"))
 		}
 	}
-	return envelope.Ok(c, fiber.StatusOK, detailToDTO(d), "watch updated")
+	return envelope.Ok(c, fiber.StatusOK, detailToDTO(d), i18n.T(loc, "watches.updated"))
 }
 
 // DeleteWatch godoc
@@ -150,7 +155,7 @@ func (a *API) UpdateWatch(c fiber.Ctx) error {
 func (a *API) DeleteWatch(c fiber.Ctx) error {
 	id := domain.WatchID(c.Params("id"))
 	if err := a.Watches.Delete(c, id); err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "watch not found")
+		return fiber.NewError(fiber.StatusNotFound, i18n.T(i18n.From(c), "watches.not_found"))
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -171,17 +176,21 @@ type runNowResponse struct {
 // @Failure      502  {string}  string  "run failed: <cause>"
 // @Router       /watches/{id}/run [post]
 func (a *API) RunWatchNow(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	id := domain.WatchID(c.Params("id"))
 	text, err := a.Watches.RunNow(c, id, true)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "watch not found")
+			return fiber.NewError(fiber.StatusNotFound, i18n.T(loc, "watches.not_found"))
 		default:
-			return fiber.NewError(fiber.StatusBadGateway, "run failed: "+err.Error())
+			// err.Error() stays untranslated by design — it's the
+			// pipeline's own failure cause (often a wrapped third-party
+			// error, e.g. a provider timeout), not app-authored prose.
+			return fiber.NewError(fiber.StatusBadGateway, i18n.T(loc, "watches.run_failed")+": "+err.Error())
 		}
 	}
-	return envelope.Ok(c, fiber.StatusOK, runNowResponse{Message: text}, "watch run started")
+	return envelope.Ok(c, fiber.StatusOK, runNowResponse{Message: text}, i18n.T(loc, "watches.run_started"))
 }
 
 // GetHistory godoc
@@ -201,7 +210,7 @@ func (a *API) GetHistory(c fiber.Ctx) error {
 
 	h, err := a.Watches.History(c, id, days)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "list price samples")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(i18n.From(c), "watches.history_failed"))
 	}
 
 	if h.LastUpdated != nil {
@@ -215,7 +224,7 @@ func (a *API) GetHistory(c fiber.Ctx) error {
 	if !h.NextRun.IsZero() {
 		resp.NextRun = &h.NextRun
 	}
-	return envelope.Ok(c, fiber.StatusOK, resp, "history")
+	return envelope.Ok(c, fiber.StatusOK, resp, i18n.T(i18n.From(c), "watches.history"))
 }
 
 func parseRangeDays(r string) int {

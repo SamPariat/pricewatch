@@ -11,10 +11,17 @@ import { PriceChart } from "@/components/price-chart";
 import { RunNowButton } from "@/components/run-now-button";
 import { WatchToggle } from "@/components/watch-toggle";
 import { DeleteWatchButton } from "@/components/delete-watch-button";
+import { getLocale, getTranslations } from "next-intl/server";
 
 export default async function WatchDetailPage(props: PageProps<"/watches/[id]">) {
   const { id } = await props.params;
-  const [watch, history] = await Promise.all([api.getWatch(id), api.getHistory(id, "90d")]);
+  const [watch, history, locale, t, tForm] = await Promise.all([
+    api.getWatch(id),
+    api.getHistory(id, "90d"),
+    getLocale(),
+    getTranslations("watchDetail"),
+    getTranslations("watchForm"),
+  ]);
 
   const currency = watch.price?.currency ?? "INR";
   const low7d = rollingLow(history.samples, 7);
@@ -29,8 +36,8 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
             <ArrowLeft className="size-4.5" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold tracking-tight md:text-[19px]">{watchTitle(watch)}</h1>
-            <p className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch)}</p>
+            <h1 className="text-lg font-bold tracking-tight md:text-[19px]">{watchTitle(watch, tForm)}</h1>
+            <p className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</p>
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
@@ -38,7 +45,7 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
           <Button variant="outline" asChild>
             <Link href={`/watches/${watch.id}/edit`}>
               <Pencil className="size-3.5" />
-              Edit
+              {t("edit")}
             </Link>
           </Button>
         </div>
@@ -46,17 +53,17 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
 
       <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-[12.5px]">
         <span>
-          Updated <RelativeTime iso={watch.last_updated_at} /> · next check <RelativeTime iso={watch.next_run} />
+          {t("updatedPrefix")} <RelativeTime iso={watch.last_updated_at} /> · {t("nextCheckPrefix")} <RelativeTime iso={watch.next_run} />
         </span>
       </div>
-      <p className="-mt-4 text-[11px] text-muted-foreground">Prices are indicative, not bookable — confirm on the provider before booking.</p>
+      <p className="-mt-4 text-[11px] text-muted-foreground">{t("indicativeNotice")}</p>
 
       <StalenessBadge watch={watch} />
 
       {watch.price && (
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-[13px] text-muted-foreground">Cheapest right now</div>
+            <div className="text-[13px] text-muted-foreground">{t("cheapestNow")}</div>
             <div className="font-mono text-3xl font-semibold tracking-tight">
               {formatPrice(watch.price.price_minor, watch.price.currency)}
             </div>
@@ -68,7 +75,7 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
       {watch.price?.percentile !== undefined && (
         <div className="rounded-lg bg-success/10 px-4 py-3.5">
           <p className="text-[13.5px] font-semibold text-success">
-            Cheaper than {watch.price.percentile.toFixed(0)}% of the last 90 days
+            {t("cheaperThanPct", { Pct: watch.price.percentile.toFixed(0) })}
           </p>
         </div>
       )}
@@ -78,15 +85,15 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <StatTile label="7D low" value={low7d !== undefined ? formatPrice(low7d, currency) : "—"} />
-        <StatTile label="30D median" value={median30d !== undefined ? formatPrice(median30d, currency) : "—"} />
-        <StatTile label="All-time low" value={atl ? formatPrice(atl.minor, currency) : "—"} tone="warning" />
+        <StatTile label={t("stat7dLow")} value={low7d !== undefined ? formatPrice(low7d, currency) : "—"} />
+        <StatTile label={t("stat30dMedian")} value={median30d !== undefined ? formatPrice(median30d, currency) : "—"} />
+        <StatTile label={t("statAllTimeLow")} value={atl ? formatPrice(atl.minor, currency) : "—"} tone="warning" />
       </div>
 
       <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
         <div>
-          <div className="text-[13.5px] font-medium">Watch enabled</div>
-          <div className="text-[12px] text-muted-foreground">Daily at {formatCronTime(watch.cron_expr)} ({watch.timezone})</div>
+          <div className="text-[13.5px] font-medium">{t("watchEnabled")}</div>
+          <div className="text-[12px] text-muted-foreground">{t("dailyAt", { Time: formatCronTime(watch.cron_expr), Tz: watch.timezone })}</div>
         </div>
         <WatchToggle watch={watch} />
       </div>

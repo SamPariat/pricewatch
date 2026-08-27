@@ -21,6 +21,7 @@ import (
 // constructed.
 func Router(app *fiber.App, api *handlers.API) {
 	group := app.Group("/api/" + handlers.APIVersion)
+	group.Use(apimw.Locale())
 	// Covers /auth/login too — rate-limiting login attempts is a feature,
 	// not an oversight.
 	group.Use(limiter.New(limiter.Config{Max: 120, Expiration: time.Minute}))

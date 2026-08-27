@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/logging"
 	"github.com/SamPariat/pricewatch/internal/notify/telegram"
 	"github.com/SamPariat/pricewatch/internal/scheduler"
@@ -70,14 +71,22 @@ func (l *Listener) handleCallback(ctx context.Context, cb telegram.CallbackQuery
 		return
 	}
 
+	// Resolved once per callback, not per helper — there's no
+	// Accept-Language header on a Telegram callback, so Settings.Language
+	// is the only source of locale here, same as the digest itself.
+	loc := i18n.EN
+	if settings, err := l.Repo.GetSettings(ctx); err == nil && i18n.Valid(settings.Language) {
+		loc = i18n.Locale(settings.Language)
+	}
+
 	var confirmText string
 	switch action {
 	case "snooze":
-		confirmText = l.snooze(ctx, domain.WatchID(watchID))
+		confirmText = l.snooze(ctx, domain.WatchID(watchID), loc)
 	case "pause":
-		confirmText = l.pause(ctx, domain.WatchID(watchID))
+		confirmText = l.pause(ctx, domain.WatchID(watchID), loc)
 	case "refresh":
-		confirmText = l.refresh(ctx, domain.WatchID(watchID))
+		confirmText = l.refresh(ctx, domain.WatchID(watchID), loc)
 	default:
 		return
 	}
@@ -98,29 +107,29 @@ func parseCallback(data string) (action, watchID string, ok bool) {
 	return before, after, true
 }
 
-func (l *Listener) snooze(ctx context.Context, id domain.WatchID) string {
+func (l *Listener) snooze(ctx context.Context, id domain.WatchID, loc i18n.Locale) string {
 	until := time.Now().Add(snoozeDuration)
 	if err := l.Repo.SetSnooze(ctx, id, &until); err != nil {
 		logging.From(ctx).Error().Str("watch_id", string(id)).Err(err).Msg("telegrambot: snooze failed")
-		return "Failed to snooze — try again from the panel."
+		return i18n.T(loc, "telegram.snooze_failed")
 	}
-	return "Snoozed for 7 days."
+	return i18n.T(loc, "telegram.snoozed")
 }
 
-func (l *Listener) pause(ctx context.Context, id domain.WatchID) string {
+func (l *Listener) pause(ctx context.Context, id domain.WatchID, loc i18n.Locale) string {
 	w, err := l.Repo.GetWatch(ctx, id)
 	if err != nil {
-		return "Watch not found."
+		return i18n.T(loc, "telegram.watch_not_found")
 	}
 	w.Enabled = false
 	if _, err := l.Repo.UpdateWatch(ctx, w); err != nil {
 		logging.From(ctx).Error().Str("watch_id", string(id)).Err(err).Msg("telegrambot: pause failed")
-		return "Failed to pause — try again from the panel."
+		return i18n.T(loc, "telegram.pause_failed")
 	}
 	if err := l.Sched.Reload(ctx); err != nil {
 		logging.From(ctx).Error().Err(err).Msg("telegrambot: reload after pause")
 	}
-	return "Paused. Re-enable it from the panel when you're ready."
+	return i18n.T(loc, "telegram.paused")
 }
 
 // refresh delegates entirely to WatchService.RunNow — the same method
@@ -128,12 +137,12 @@ func (l *Listener) pause(ctx context.Context, id domain.WatchID) string {
 // — so this button and that one can never drift in behavior. Before the
 // service layer existed, this method duplicated RunNow's mint-runID /
 // SkipCache / RunWatch / Send sequence by hand.
-func (l *Listener) refresh(ctx context.Context, id domain.WatchID) string {
+func (l *Listener) refresh(ctx context.Context, id domain.WatchID, loc i18n.Locale) string {
 	if _, err := l.Watches.RunNow(ctx, id, true); err != nil {
 		if errors.Is(err, service.ErrNotFound) {
-			return "Watch not found."
+			return i18n.T(loc, "telegram.watch_not_found")
 		}
-		return "Refresh failed — check the run log in the panel."
+		return i18n.T(loc, "telegram.refresh_failed")
 	}
-	return "Refreshed."
+	return i18n.T(loc, "telegram.refreshed")
 }

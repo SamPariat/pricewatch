@@ -3,19 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutList, History, Settings } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { href: "/watches", label: "Watches", icon: LayoutList },
-  { href: "/runs", label: "Runs", icon: History },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+function links(t: ReturnType<typeof useTranslations<"nav">>) {
+  return [
+    { href: "/watches", label: t("watches"), icon: LayoutList },
+    { href: "/runs", label: t("runs"), icon: History },
+    { href: "/settings", label: t("settings"), icon: Settings },
+  ];
+}
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   return (
     <nav className="flex flex-col gap-0.5">
-      {LINKS.map(({ href, label, icon: Icon }) => {
+      {links(t).map(({ href, label, icon: Icon }) => {
         const active = pathname.startsWith(href);
         return (
           <Link
@@ -39,9 +43,10 @@ export function SidebarNav() {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   return (
     <nav className="flex border-t border-border bg-card px-2 pt-2.5 pb-3.5">
-      {LINKS.map(({ href, label, icon: Icon }) => {
+      {links(t).map(({ href, label, icon: Icon }) => {
         const active = pathname.startsWith(href);
         return (
           <Link

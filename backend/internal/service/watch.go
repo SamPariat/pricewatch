@@ -11,6 +11,7 @@ import (
 	"github.com/SamPariat/pricewatch/internal/analytics"
 	"github.com/SamPariat/pricewatch/internal/domain"
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/logging"
 	"github.com/SamPariat/pricewatch/internal/pipeline"
 	"github.com/SamPariat/pricewatch/internal/providers"
@@ -102,7 +103,7 @@ func (s *WatchService) Create(ctx context.Context, in WatchInput) (Detail, error
 	if in.Enabled != nil {
 		w.Enabled = *in.Enabled
 	}
-	if err := validateWatch(w); err != nil {
+	if err := validateWatch(ctx, w); err != nil {
 		return Detail{}, ValidationError{err}
 	}
 
@@ -147,7 +148,7 @@ func (s *WatchService) Update(ctx context.Context, id domain.WatchID, in WatchIn
 	if in.Enabled != nil {
 		updated.Enabled = *in.Enabled
 	}
-	if err := validateWatch(updated); err != nil {
+	if err := validateWatch(ctx, updated); err != nil {
 		return Detail{}, ValidationError{err}
 	}
 
@@ -185,24 +186,35 @@ func (s *WatchService) RunNow(ctx context.Context, id domain.WatchID, send bool)
 		return "", ErrNotFound
 	}
 
+	// The rendered text is shared between the API response and (when
+	// send is true) the actual Telegram message, so it can only be in
+	// one language — Settings.Language wins over whatever locale the
+	// caller's own context carries (an HTTP "Run now" click forwards the
+	// admin's panel language via Accept-Language), since this text is
+	// the real digest content the Telegram group sees, not UI chrome.
+	// The Telegram "Refresh now" button has no locale on its context at
+	// all, so it needs this regardless.
+	settings, serr := s.Repo.GetSettings(ctx)
+	loc := i18n.From(ctx)
+	if serr == nil && i18n.Valid(settings.Language) {
+		loc = i18n.Locale(settings.Language)
+	}
+
 	runID := domain.RunID(ulid.Make().String())
-	rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(id))
+	rctx := i18n.With(logging.With(ctx, "run_id", string(runID), "watch_id", string(id)), loc)
 	rctx = providers.SkipCache(rctx)
-	text, err := s.Pipeline.RunWatch(rctx, runID, w)
+	res, err := s.Pipeline.RunWatch(rctx, runID, w)
 	if err != nil {
 		return "", RunError{err}
 	}
 
-	if send {
-		settings, serr := s.Repo.GetSettings(ctx)
-		if serr == nil && !settings.DryRun && settings.TelegramChatID != "" {
-			msg := domain.Message{Text: render.CombineDigest([]string{text})}
-			if err := s.Notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
-				logging.From(rctx).Error().Err(err).Msg("run-now: send failed")
-			}
+	if send && serr == nil && !settings.DryRun && settings.TelegramChatID != "" {
+		msg := domain.Message{Text: render.CombineDigest([]string{res.Text}, loc)}
+		if err := s.Notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
+			logging.From(rctx).Error().Err(err).Msg("run-now: send failed")
 		}
 	}
-	return text, nil
+	return res.Text, nil
 }
 
 // History returns the price-history view for one watch, days back from
@@ -279,23 +291,30 @@ func (s *WatchService) priceSummary(ctx context.Context, id domain.WatchID, curr
 	return &lastUpdated, summary
 }
 
-func validateWatch(w domain.Watch) error {
+// validateWatch's messages are localized via i18n.From(ctx) — for the
+// wrapped %w errors from cron.ParseStandard and time.LoadLocation, only
+// the app-authored prefix is translated; the wrapped library error text
+// itself stays in English, the same way a stack trace frame or a raw
+// field name would in any localized system (see internal/i18n's own doc
+// comment).
+func validateWatch(ctx context.Context, w domain.Watch) error {
+	loc := i18n.From(ctx)
 	if !w.Kind.Valid() {
-		return fmt.Errorf("invalid kind %q", w.Kind)
+		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_kind", "Kind", w.Kind))
 	}
 	if _, err := cron.ParseStandard(w.CronExpr); err != nil {
-		return fmt.Errorf("invalid cron_expr: %w", err)
+		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_cron", "Error", err.Error()))
 	}
 	if w.Timezone != "" {
 		if _, err := time.LoadLocation(w.Timezone); err != nil {
-			return fmt.Errorf("invalid timezone: %w", err)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_timezone", "Error", err.Error()))
 		}
 	}
 	switch {
 	case w.Kind.IsFlight():
 		p, err := w.DecodeFlightParams()
 		if err != nil {
-			return fmt.Errorf("invalid params for kind %q: %w", w.Kind, err)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
 		}
 		// json.Unmarshal silently ignores fields it doesn't recognize —
 		// hotel-shaped params ({"location":...}) decode into a
@@ -303,18 +322,18 @@ func validateWatch(w domain.Watch) error {
 		// decoding alone doesn't prove the params actually matched the
 		// kind. Checking the required fields landed does.
 		if p.Origin == "" || p.Destination == "" || p.DepartDate == "" {
-			return fmt.Errorf("invalid params for kind %q: origin, destination, and depart_date are required", w.Kind)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_flight_fields", "Kind", w.Kind))
 		}
 		if w.Kind == domain.AssetFlightReturn && (p.ReturnDate == nil || *p.ReturnDate == "") {
-			return fmt.Errorf("invalid params for kind %q: return_date is required", w.Kind)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_return_date", "Kind", w.Kind))
 		}
 	case w.Kind == domain.AssetHotel || w.Kind == domain.AssetRental:
 		p, err := w.DecodeHotelParams()
 		if err != nil {
-			return fmt.Errorf("invalid params for kind %q: %w", w.Kind, err)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
 		}
 		if p.Location == "" || p.CheckIn == "" || p.CheckOut == "" {
-			return fmt.Errorf("invalid params for kind %q: location, check_in, and check_out are required", w.Kind)
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_hotel_fields", "Kind", w.Kind))
 		}
 	}
 	return nil

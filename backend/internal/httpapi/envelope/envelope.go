@@ -5,7 +5,11 @@
 // Logout, DeleteWatch), which stay genuinely bodyless per RFC 9110.
 package envelope
 
-import "github.com/gofiber/fiber/v3"
+import (
+	"github.com/gofiber/fiber/v3"
+
+	"github.com/SamPariat/pricewatch/internal/i18n"
+)
 
 // Envelope is the wire shape of every enveloped response. Data is `any`
 // rather than a generic type parameter because callers wrap slices,
@@ -31,7 +35,7 @@ func Ok(c fiber.Ctx, status int, data any, message string) error {
 // via fiber.Config{ErrorHandler: envelope.ErrorHandler}.
 func ErrorHandler(c fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
-	msg := "internal server error"
+	msg := i18n.T(i18n.From(c), "common.internal_error")
 	if fe, ok := err.(*fiber.Error); ok {
 		code, msg = fe.Code, fe.Message
 	}

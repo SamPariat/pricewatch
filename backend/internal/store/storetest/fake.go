@@ -38,7 +38,7 @@ func New() *FakeRepository {
 		runs:       make(map[domain.RunID]domain.DigestRun),
 		events:     make(map[domain.RunID][]domain.RunEvent),
 		watchState: make(map[domain.WatchID]domain.WatchState),
-		settings:   domain.Settings{Currency: "INR"},
+		settings:   domain.Settings{Currency: "INR", Language: "en"},
 	}
 }
 

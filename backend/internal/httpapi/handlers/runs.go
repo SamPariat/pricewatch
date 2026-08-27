@@ -6,6 +6,7 @@ import (
 	"github.com/SamPariat/pricewatch/internal/domain"
 	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 // ListRuns godoc
@@ -18,11 +19,12 @@ import (
 // @Failure      500  {string}  string  "list runs"
 // @Router       /runs [get]
 func (a *API) ListRuns(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	runs, err := a.Runs.List(c, 50)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "list runs")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "runs.list_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, v1.DigestRunsOf(runs), "runs listed")
+	return envelope.Ok(c, fiber.StatusOK, v1.DigestRunsOf(runs), i18n.T(loc, "runs.listed"))
 }
 
 // GetRunEvents godoc
@@ -36,10 +38,11 @@ func (a *API) ListRuns(c fiber.Ctx) error {
 // @Failure      500     {string}  string  "list run events"
 // @Router       /runs/{run_id}/events [get]
 func (a *API) GetRunEvents(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	runID := domain.RunID(c.Params("run_id"))
 	events, err := a.Runs.Events(c, runID)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "list run events")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "runs.events_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, v1.RunEventsOf(events), "run events")
+	return envelope.Ok(c, fiber.StatusOK, v1.RunEventsOf(events), i18n.T(loc, "runs.events_ok"))
 }

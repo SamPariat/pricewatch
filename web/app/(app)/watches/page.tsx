@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { DeltaBadge } from "@/components/delta-badge";
 import { RelativeTime } from "@/components/relative-time";
 import { StalenessBadge } from "@/components/staleness-badge";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { Watch } from "@/lib/types";
+
+type WatchesT = Awaited<ReturnType<typeof getTranslations<"watches">>>;
+type WatchFormT = Awaited<ReturnType<typeof getTranslations<"watchForm">>>;
 
 function KindIcon({ kind }: { kind: Watch["kind"] }) {
   const Icon = kind === "hotel" || kind === "rental" ? BedDouble : Plane;
@@ -19,19 +23,25 @@ function KindIcon({ kind }: { kind: Watch["kind"] }) {
 }
 
 export default async function WatchesPage() {
-  const [watches, summary] = await Promise.all([api.getWatches(), api.getAnalyticsSummary()]);
+  const [watches, summary, locale, t, tForm] = await Promise.all([
+    api.getWatches(),
+    api.getAnalyticsSummary(),
+    getLocale(),
+    getTranslations("watches"),
+    getTranslations("watchForm"),
+  ]);
 
   return (
     <div className="flex flex-col gap-6 p-5 md:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-[20px]">Watches</h1>
+          <h1 className="text-xl font-bold tracking-tight md:text-[20px]">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">
-            {summary.enabled_watches} active
+            {summary.enabled_watches} {t("active")}
             {summary.stale_watches > 0 && (
               <>
                 {" "}
-                · <span className="font-medium text-warning">{summary.stale_watches} needs attention</span>
+                · <span className="font-medium text-warning">{summary.stale_watches} {t("needsAttention")}</span>
               </>
             )}
           </p>
@@ -39,31 +49,31 @@ export default async function WatchesPage() {
         <Button asChild className="hidden md:inline-flex">
           <Link href="/watches/new">
             <Plus className="size-4" />
-            New watch
+            {t("newWatch")}
           </Link>
         </Button>
       </div>
 
       {watches.length === 0 ? (
-        <EmptyState />
+        <EmptyState t={t} />
       ) : (
         <>
           {/* Desktop KPI row */}
           <div className="hidden gap-4 md:grid md:grid-cols-4">
-            <Kpi label="Active watches" value={String(summary.enabled_watches)} />
+            <Kpi label={t("kpiActive")} value={String(summary.enabled_watches)} />
             <Kpi
-              label="Avg change, 7d"
+              label={t("kpiAvgChange7d")}
               value={summary.avg_delta_7d_pct !== undefined ? `${summary.avg_delta_7d_pct.toFixed(1)}%` : "—"}
               tone={summary.avg_delta_7d_pct !== undefined && summary.avg_delta_7d_pct < 0 ? "success" : undefined}
             />
-            <Kpi label="Total watches" value={String(summary.total_watches)} />
-            <Kpi label="Needs attention" value={String(summary.stale_watches)} tone={summary.stale_watches > 0 ? "warning" : undefined} />
+            <Kpi label={t("kpiTotal")} value={String(summary.total_watches)} />
+            <Kpi label={t("kpiNeedsAttention")} value={String(summary.stale_watches)} tone={summary.stale_watches > 0 ? "warning" : undefined} />
           </div>
 
           {/* Mobile: cards */}
           <div className="flex flex-col gap-3 md:hidden">
             {watches.map((w) => (
-              <WatchCard key={w.id} watch={w} />
+              <WatchCard key={w.id} watch={w} locale={locale} t={t} tForm={tForm} />
             ))}
           </div>
 
@@ -72,16 +82,16 @@ export default async function WatchesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <Th>Watch</Th>
-                  <Th>Price</Th>
-                  <Th>Δ vs yesterday</Th>
-                  <Th>Updated</Th>
-                  <Th>Status</Th>
+                  <Th>{t("colWatch")}</Th>
+                  <Th>{t("colPrice")}</Th>
+                  <Th>{t("colDelta")}</Th>
+                  <Th>{t("colUpdated")}</Th>
+                  <Th>{t("colStatus")}</Th>
                 </tr>
               </thead>
               <tbody>
                 {watches.map((w) => (
-                  <WatchRow key={w.id} watch={w} />
+                  <WatchRow key={w.id} watch={w} locale={locale} t={t} tForm={tForm} />
                 ))}
               </tbody>
             </table>
@@ -109,7 +119,7 @@ function Th({ children }: { children: React.ReactNode }) {
   return <th className="h-10 px-5 text-left text-[12.5px] font-medium text-muted-foreground">{children}</th>;
 }
 
-function WatchCard({ watch }: { watch: Watch }) {
+function WatchCard({ watch, locale, t, tForm }: { watch: Watch; locale: string; t: WatchesT; tForm: WatchFormT }) {
   return (
     <Link
       href={`/watches/${watch.id}`}
@@ -119,8 +129,8 @@ function WatchCard({ watch }: { watch: Watch }) {
         <div className="flex items-start gap-3">
           <KindIcon kind={watch.kind} />
           <div className="flex flex-col gap-0.5">
-            <span className="text-[14.5px] font-semibold">{watchTitle(watch)}</span>
-            <span className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch)}</span>
+            <span className="text-[14.5px] font-semibold">{watchTitle(watch, tForm)}</span>
+            <span className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</span>
           </div>
         </div>
         {watch.price && (
@@ -134,22 +144,22 @@ function WatchCard({ watch }: { watch: Watch }) {
         <StalenessBadge watch={watch} />
       ) : (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Updated <RelativeTime iso={watch.last_updated_at} />
+          {t("updatedPrefix")} <RelativeTime iso={watch.last_updated_at} />
         </div>
       )}
     </Link>
   );
 }
 
-function WatchRow({ watch }: { watch: Watch }) {
+function WatchRow({ watch, locale, t, tForm }: { watch: Watch; locale: string; t: WatchesT; tForm: WatchFormT }) {
   return (
     <tr className={`border-b border-border last:border-0 ${watch.stale ? "bg-warning/10" : ""}`}>
       <td className="px-5 py-3.5">
         <Link href={`/watches/${watch.id}`} className="flex items-center gap-2.5">
           <KindIcon kind={watch.kind} />
           <div className="flex flex-col">
-            <span className="text-[13.5px] font-semibold">{watchTitle(watch)}</span>
-            <span className="text-[11.5px] text-muted-foreground">{watchSubtitle(watch)}</span>
+            <span className="text-[13.5px] font-semibold">{watchTitle(watch, tForm)}</span>
+            <span className="text-[11.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</span>
           </div>
         </Link>
       </td>
@@ -164,10 +174,10 @@ function WatchRow({ watch }: { watch: Watch }) {
       </td>
       <td className="px-5 py-3.5">
         {watch.stale ? (
-          <Badge className="bg-warning text-warning-foreground">Needs attention</Badge>
+          <Badge className="bg-warning text-warning-foreground">{t("kpiNeedsAttention")}</Badge>
         ) : (
           <Badge variant="secondary" className="bg-success/15 text-success">
-            OK
+            {t("statusOk")}
           </Badge>
         )}
       </td>
@@ -175,14 +185,14 @@ function WatchRow({ watch }: { watch: Watch }) {
   );
 }
 
-function EmptyState() {
+function EmptyState({ t }: { t: WatchesT }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-      <p className="text-sm text-muted-foreground">No watches yet — add one to start tracking prices.</p>
+      <p className="text-sm text-muted-foreground">{t("emptyText")}</p>
       <Button asChild>
         <Link href="/watches/new">
           <Plus className="size-4" />
-          New watch
+          {t("newWatch")}
         </Link>
       </Button>
     </div>

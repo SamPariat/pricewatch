@@ -2,11 +2,13 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/container";
 import { cn } from "@/lib/utils";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { RunEvent } from "@/lib/types";
 
 export default async function RunDetailPage(props: PageProps<"/runs/[runId]">) {
   const { runId } = await props.params;
-  const events = await api.getRunEvents(runId);
+  const [events, locale, t] = await Promise.all([api.getRunEvents(runId), getLocale(), getTranslations("runDetail")]);
+  const timeTag = locale === "hi" ? "hi-IN" : "en-US";
 
   return (
     <div className="flex flex-col gap-6 p-5 md:mx-auto md:max-w-2xl md:p-8">
@@ -15,19 +17,19 @@ export default async function RunDetailPage(props: PageProps<"/runs/[runId]">) {
           <ArrowLeft className="size-4.5" />
         </Link>
         <div>
-          <h1 className="text-lg font-bold tracking-tight">Run timeline</h1>
+          <h1 className="text-lg font-bold tracking-tight">{t("title")}</h1>
           <p className="font-mono text-[11.5px] text-muted-foreground">{runId}</p>
         </div>
       </div>
 
       {events.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-          No events recorded for this run.
+          {t("empty")}
         </p>
       ) : (
         <div className="rounded-xl border border-border bg-card p-4">
           {events.map((event, i) => (
-            <EventRow key={i} event={event} isLast={i === events.length - 1} />
+            <EventRow key={i} event={event} isLast={i === events.length - 1} timeTag={timeTag} />
           ))}
         </div>
       )}
@@ -35,7 +37,12 @@ export default async function RunDetailPage(props: PageProps<"/runs/[runId]">) {
   );
 }
 
-function EventRow({ event, isLast }: { event: RunEvent; isLast: boolean }) {
+// event.stage and event.msg stay untranslated by design — see
+// backend/internal/pipeline's p.emit calls, which are the ops/debugging
+// timeline behind "why didn't the digest arrive," not user-facing
+// digest prose. Same boundary as backend/internal/i18n's own doc
+// comment on wrapped third-party errors.
+function EventRow({ event, isLast, timeTag }: { event: RunEvent; isLast: boolean; timeTag: string }) {
   const dotColor =
     event.level === "error" ? "bg-destructive" : event.level === "warn" ? "bg-warning" : "bg-success";
 
@@ -51,7 +58,7 @@ function EventRow({ event, isLast }: { event: RunEvent; isLast: boolean }) {
           <span className="text-[12px] text-muted-foreground">{event.msg}</span>
         </div>
         <span className="shrink-0 pl-3 font-mono text-[11px] text-muted-foreground">
-          {new Date(event.at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          {new Date(event.at).toLocaleTimeString(timeTag, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
         </span>
       </div>
     </div>

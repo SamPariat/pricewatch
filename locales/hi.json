@@ -1,0 +1,237 @@
+{
+  "backend": {
+    "common": {
+      "invalid_body": "अमान्य अनुरोध डेटा",
+      "not_authenticated": "प्रमाणीकरण आवश्यक है",
+      "internal_error": "आंतरिक सर्वर त्रुटि",
+      "not_found": "नहीं मिला"
+    },
+    "watches": {
+      "list_failed": "वॉच सूची प्राप्त करने में विफल",
+      "listed": "वॉच सूची प्राप्त हुई",
+      "not_found": "वॉच नहीं मिला",
+      "found": "वॉच मिला",
+      "create_failed": "वॉच बनाने में विफल",
+      "created": "वॉच बनाया गया",
+      "update_failed": "वॉच अपडेट करने में विफल",
+      "updated": "वॉच अपडेट हुआ",
+      "run_started": "वॉच रन शुरू हुआ",
+      "run_failed": "रन विफल हुआ",
+      "history_failed": "मूल्य इतिहास प्राप्त करने में विफल",
+      "history": "इतिहास"
+    },
+    "settings": {
+      "get_failed": "सेटिंग्स प्राप्त करने में विफल",
+      "get_ok": "सेटिंग्स",
+      "update_failed": "सेटिंग्स अपडेट करने में विफल",
+      "update_ok": "सेटिंग्स अपडेट हुईं"
+    },
+    "meta": {
+      "ok": "ठीक है"
+    },
+    "auth": {
+      "invalid_password": "गलत पासवर्ड"
+    },
+    "channel": {
+      "check_failed": "चैनल स्थिति जांचने में विफल",
+      "status_ok": "चैनल स्थिति"
+    },
+    "runs": {
+      "list_failed": "रन सूची प्राप्त करने में विफल",
+      "listed": "रन सूची प्राप्त हुई",
+      "events_failed": "रन इवेंट प्राप्त करने में विफल",
+      "events_ok": "रन इवेंट"
+    },
+    "analytics": {
+      "summary_failed": "सारांश प्राप्त करने में विफल",
+      "summary_ok": "विश्लेषण सारांश"
+    },
+    "validation": {
+      "invalid_kind": "अमान्य किस्म \"{Kind}\"",
+      "invalid_cron": "अमान्य cron_expr: {Error}",
+      "invalid_timezone": "अमान्य समय क्षेत्र: {Error}",
+      "invalid_params": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: {Error}",
+      "missing_flight_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: origin, destination और depart_date आवश्यक हैं",
+      "missing_return_date": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: return_date आवश्यक है",
+      "missing_hotel_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: location, check_in और check_out आवश्यक हैं"
+    },
+    "digest": {
+      "header_singular": "दैनिक डाइजेस्ट — {Count} वॉच",
+      "header_plural": "दैनिक डाइजेस्ट — {Count} वॉच",
+      "up": "ऊपर",
+      "down": "नीचे",
+      "delta": "{Arrow} {Pct}% (कल की तुलना में {Word})",
+      "cheaper_than_pct": "पिछले 90 दिनों के {Pct}% से सस्ता",
+      "all_time_low": "सर्वकालिक न्यूनतम: {Price}, {Date} को",
+      "no_exact_match": "⚠️ सटीक मिलान नहीं — निकटतम किराया {Dates} मिला",
+      "flight_return": "· राउंड ट्रिप",
+      "flight_oneway": "· वन-वे"
+    },
+    "alert": {
+      "threshold_header": "🔔 सीमा अलर्ट"
+    },
+    "telegram": {
+      "snoozed": "7 दिनों के लिए स्नूज़ किया गया।",
+      "snooze_failed": "स्नूज़ विफल — कृपया पैनल से पुनः प्रयास करें।",
+      "watch_not_found": "वॉच नहीं मिला।",
+      "pause_failed": "रोकने में विफल — कृपया पैनल से पुनः प्रयास करें।",
+      "paused": "रोक दिया गया। तैयार होने पर पैनल से इसे फिर से चालू करें।",
+      "refresh_failed": "रीफ़्रेश विफल — पैनल में रन लॉग जांचें।",
+      "refreshed": "रीफ़्रेश हो गया।"
+    }
+  },
+  "nav": {
+    "watches": "वॉच",
+    "runs": "रन",
+    "settings": "सेटिंग्स",
+    "signOut": "साइन आउट"
+  },
+  "channel": {
+    "connected": "Telegram जुड़ा हुआ है",
+    "disconnected": "Telegram डिस्कनेक्ट है"
+  },
+  "common": {
+    "saving": "सहेजा जा रहा है…",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "deleting": "हटाया जा रहा है…",
+    "edit": "संपादित करें",
+    "never": "कभी अपडेट नहीं हुआ",
+    "unknown": "अज्ञात",
+    "justNow": "अभी-अभी",
+    "minutesAgo": "{Count} मिनट पहले",
+    "hoursAgo": "{Count} घंटे पहले",
+    "daysAgo": "{Count} दिन पहले"
+  },
+  "login": {
+    "title": "Pricewatch",
+    "subtitle": "अपने वॉच प्रबंधित करने के लिए साइन इन करें",
+    "passwordLabel": "पासवर्ड",
+    "signingIn": "साइन इन हो रहा है…",
+    "signIn": "साइन इन करें"
+  },
+  "watches": {
+    "title": "वॉच",
+    "active": "सक्रिय",
+    "needsAttention": "ध्यान देने योग्य",
+    "newWatch": "नया वॉच",
+    "emptyText": "अभी तक कोई वॉच नहीं — कीमतें ट्रैक करने के लिए एक जोड़ें।",
+    "kpiActive": "सक्रिय वॉच",
+    "kpiAvgChange7d": "औसत बदलाव, 7 दिन",
+    "kpiTotal": "कुल वॉच",
+    "kpiNeedsAttention": "ध्यान देने योग्य",
+    "colWatch": "वॉच",
+    "colPrice": "कीमत",
+    "colDelta": "Δ कल की तुलना में",
+    "colUpdated": "अपडेट किया गया",
+    "colStatus": "स्थिति",
+    "statusOk": "ठीक",
+    "updatedPrefix": "अपडेट किया गया"
+  },
+  "watchDetail": {
+    "edit": "संपादित करें",
+    "updatedPrefix": "अपडेट किया गया",
+    "nextCheckPrefix": "अगली जांच",
+    "indicativeNotice": "कीमतें केवल संकेतात्मक हैं, बुक करने योग्य नहीं — बुकिंग से पहले प्रोवाइडर पर पुष्टि करें।",
+    "cheapestNow": "अभी सबसे सस्ता",
+    "cheaperThanPct": "पिछले 90 दिनों के {Pct}% से सस्ता",
+    "stat7dLow": "7 दिन का न्यूनतम",
+    "stat30dMedian": "30 दिन का माध्यिका",
+    "statAllTimeLow": "सर्वकालिक न्यूनतम",
+    "watchEnabled": "वॉच सक्रिय",
+    "dailyAt": "प्रतिदिन {Time} बजे ({Tz})"
+  },
+  "watchForm": {
+    "typeLabel": "प्रकार",
+    "kindOneWay": "वन-वे",
+    "kindReturn": "राउंड ट्रिप",
+    "kindHotel": "होटल",
+    "kindRental": "रेंटल",
+    "originLabel": "प्रस्थान (IATA)",
+    "destinationLabel": "गंतव्य (IATA)",
+    "departDateLabel": "प्रस्थान तिथि",
+    "returnDateLabel": "वापसी तिथि",
+    "locationLabel": "स्थान",
+    "checkInLabel": "चेक-इन",
+    "checkOutLabel": "चेक-आउट",
+    "hourLabel": "जांच का समय (घंटा)",
+    "minuteLabel": "जांच का समय (मिनट)",
+    "timezoneLabel": "समय क्षेत्र",
+    "thresholdLabel": "अलर्ट सीमा (% गिरावट)",
+    "nameLabel": "नाम (वैकल्पिक)",
+    "namePlaceholder": "दिसंबर में गोवा की वापसी यात्रा",
+    "saving": "सहेजा जा रहा है…",
+    "saveChanges": "बदलाव सहेजें",
+    "saveWatch": "वॉच सहेजें"
+  },
+  "newWatch": {
+    "title": "नया वॉच",
+    "subtitle": "फ्लाइट, होटल या रेंटल की कीमत समय के साथ ट्रैक करें।"
+  },
+  "editWatch": {
+    "title": "वॉच संपादित करें"
+  },
+  "deleteDialog": {
+    "trigger": "हटाएं",
+    "title": "वॉच हटाएं?",
+    "description": "यह \"{Name}\" और उसका मूल्य इतिहास स्थायी रूप से हटा देगा। इसे वापस नहीं किया जा सकता।",
+    "fallbackName": "यह वॉच",
+    "cancel": "रद्द करें",
+    "confirm": "हटाएं",
+    "deleting": "हटाया जा रहा है…"
+  },
+  "runNow": {
+    "idle": "अभी रन करें",
+    "running": "रन हो रहा है…",
+    "done": "पूर्ण",
+    "successTitle": "रन पूर्ण हुआ",
+    "successDesc": "कीमत और चार्ट अपडेट हो गए।",
+    "failTitle": "रन विफल",
+    "failDesc": "विवरण के लिए रन लॉग देखें।",
+    "toggleFailed": "वॉच अपडेट करने में विफल"
+  },
+  "runs": {
+    "title": "रन इतिहास",
+    "subtitle": "हर फ़ेच, क्रम में — सफलता या विफलता।",
+    "empty": "अभी तक कोई रन नहीं।",
+    "today": "आज",
+    "yesterday": "कल"
+  },
+  "runDetail": {
+    "title": "रन टाइमलाइन",
+    "empty": "इस रन के लिए कोई इवेंट दर्ज नहीं हुआ।"
+  },
+  "settings": {
+    "title": "सेटिंग्स",
+    "telegramSection": "Telegram",
+    "chatIdLabel": "चैट ID",
+    "chatIdHelp": "बॉट को अपने ग्रुप में जोड़ें, फिर Bot API के getUpdates एंडपॉइंट से उसकी चैट ID पता करें।",
+    "notificationsSection": "सूचनाएं",
+    "quietStartLabel": "शांत समय शुरू",
+    "quietEndLabel": "शांत समय समाप्त",
+    "dataSection": "डेटा",
+    "currencyLabel": "डिफ़ॉल्ट मुद्रा",
+    "dryRunLabel": "ड्राई-रन मोड",
+    "dryRunHelp": "फ़ेच और रेंडर करता है लेकिन कभी Telegram पर नहीं भेजता।",
+    "languageSection": "भाषा",
+    "languageLabel": "ऐप और डाइजेस्ट की भाषा",
+    "languageHelp": "इससे इस पैनल की भाषा और Telegram डाइजेस्ट व अलर्ट की भाषा दोनों बदल जाती हैं।",
+    "languageEnglish": "English",
+    "languageHindi": "हिन्दी (Hindi)",
+    "saving": "सहेजा जा रहा है…",
+    "saveChanges": "बदलाव सहेजें",
+    "failedToSave": "सेटिंग्स सहेजने में विफल"
+  },
+  "errors": {
+    "createWatchFailed": "वॉच बनाने में विफल",
+    "updateWatchFailed": "वॉच अपडेट करने में विफल",
+    "loginServerUnreachable": "सर्वर से संपर्क नहीं हो सका — पुनः प्रयास करें।",
+    "loginIncorrectPassword": "गलत पासवर्ड।",
+    "loginSomethingWrong": "कुछ गलत हो गया — पुनः प्रयास करें।",
+    "loginNoSession": "लॉगिन सफल रहा लेकिन कोई सत्र जारी नहीं हुआ — पुनः प्रयास करें।"
+  },
+  "chart": {
+    "noHistory": "अभी तक कोई मूल्य इतिहास नहीं",
+    "medianPrice": "माध्यिका कीमत"
+  }
+}

@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { runWatchNowAction } from "@/app/(app)/watches/actions";
 
 export function RunNowButton({ watchId }: { watchId: string }) {
+  const t = useTranslations("runNow");
   const [pending, startTransition] = useTransition();
   const [justRan, setJustRan] = useState(false);
 
@@ -15,10 +17,10 @@ export function RunNowButton({ watchId }: { watchId: string }) {
       try {
         await runWatchNowAction(watchId);
         setJustRan(true);
-        toast.success("Run complete", { description: "Price and chart refreshed." });
+        toast.success(t("successTitle"), { description: t("successDesc") });
         setTimeout(() => setJustRan(false), 2000);
       } catch {
-        toast.error("Run failed", { description: "Check the run log for details." });
+        toast.error(t("failTitle"), { description: t("failDesc") });
       }
     });
   };
@@ -26,7 +28,7 @@ export function RunNowButton({ watchId }: { watchId: string }) {
   return (
     <Button variant="outline" onClick={onClick} disabled={pending}>
       <RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />
-      {pending ? "Running…" : justRan ? "Done" : "Run now"}
+      {pending ? t("running") : justRan ? t("done") : t("idle")}
     </Button>
   );
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/logging"
 	"github.com/SamPariat/pricewatch/internal/pipeline"
 	"github.com/SamPariat/pricewatch/internal/render"
@@ -179,9 +180,19 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		logging.From(ctx).Error().Err(err).Msg("scheduler: get settings")
 		return
 	}
+	// The digest is cron-triggered, not part of an HTTP request — there's
+	// no Accept-Language header to read, so Settings.Language is its only
+	// source of locale. i18n.Valid guards against an empty or corrupted
+	// column value silently rendering as English-fallback-in-every-key
+	// rather than a clear EN default.
+	loc := i18n.EN
+	if i18n.Valid(settings.Language) {
+		loc = i18n.Locale(settings.Language)
+	}
 
 	var sections []string
 	var ranWatches []domain.Watch
+	var breached []domain.Watch
 	for _, w := range ws {
 		if state, err := s.repo.GetWatchState(ctx, w.ID); err == nil && isSnoozed(state, time.Now()) {
 			logging.From(ctx).Info().Str("watch_id", string(w.ID)).Time("snoozed_until", *state.SnoozedUntil).Msg("scheduler: skipping snoozed watch")
@@ -189,14 +200,17 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		}
 
 		runID := domain.RunID(ulid.Make().String())
-		rctx := logging.With(ctx, "run_id", string(runID), "watch_id", string(w.ID))
-		text, err := s.pipeline.RunWatch(rctx, runID, w)
+		rctx := i18n.With(logging.With(ctx, "run_id", string(runID), "watch_id", string(w.ID)), loc)
+		res, err := s.pipeline.RunWatch(rctx, runID, w)
 		if err != nil {
 			logging.From(rctx).Error().Err(err).Msg("scheduler: run failed")
 			continue
 		}
-		sections = append(sections, text)
+		sections = append(sections, res.Text)
 		ranWatches = append(ranWatches, w)
+		if res.ThresholdBreach {
+			breached = append(breached, w)
+		}
 	}
 	if len(sections) == 0 {
 		return
@@ -211,7 +225,26 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		return
 	}
 
-	msg := domain.Message{Text: render.CombineDigest(sections)}
+	// Threshold alerts fire on top of the daily digest, not instead of
+	// it (PLAN.md § Further suggestions) — each breached watch gets its
+	// own immediate ping, in addition to still appearing in the combined
+	// digest below. The section text is deliberately reused rather than
+	// re-rendered so the alert and the digest entry can never disagree.
+	for _, w := range breached {
+		i := indexOf(ranWatches, w.ID)
+		if i < 0 {
+			continue
+		}
+		alert := domain.Message{
+			Text:    "<b>" + i18n.T(loc, "alert.threshold_header") + "</b>\n\n" + sections[i],
+			Buttons: snoozeButtons(w.ID),
+		}
+		if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, alert); err != nil {
+			logging.From(ctx).Error().Err(err).Str("watch_id", string(w.ID)).Msg("scheduler: threshold alert send failed")
+		}
+	}
+
+	msg := domain.Message{Text: render.CombineDigest(sections, loc)}
 	// Buttons only make sense when the message is unambiguously about one
 	// watch — a batch of several watches has no single "this one" for
 	// Snooze/Pause/Refresh to act on. See PLAN.md § Telegram.
@@ -221,6 +254,15 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
 		logging.From(ctx).Error().Err(err).Msg("scheduler: send failed")
 	}
+}
+
+func indexOf(ws []domain.Watch, id domain.WatchID) int {
+	for i, w := range ws {
+		if w.ID == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // isSnoozed reports whether now falls within a watch's active snooze

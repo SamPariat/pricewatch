@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 // Computed client-side from an absolute ISO string, never baked into a
 // server-rendered payload — an RSC-computed "6h ago" would be wrong the
@@ -14,6 +15,7 @@ import { useEffect, useState } from "react";
 // hydration mismatch. Rendering a stable placeholder until the effect
 // fires avoids both problems.
 export function RelativeTime({ iso }: { iso?: string }) {
+  const t = useTranslations("common");
   const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,15 +28,15 @@ export function RelativeTime({ iso }: { iso?: string }) {
     // render of a small <time> label, not a cascade worth restructuring
     // around.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLabel(formatRelative(Date.now() - date.getTime()));
-  }, [iso]);
+    setLabel(formatRelative(Date.now() - date.getTime(), t));
+  }, [iso, t]);
 
   if (!iso) {
-    return <span className="text-muted-foreground">Never updated</span>;
+    return <span className="text-muted-foreground">{t("never")}</span>;
   }
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
-    return <span className="text-muted-foreground">Unknown</span>;
+    return <span className="text-muted-foreground">{t("unknown")}</span>;
   }
 
   return (
@@ -44,12 +46,12 @@ export function RelativeTime({ iso }: { iso?: string }) {
   );
 }
 
-function formatRelative(ms: number): string {
+function formatRelative(ms: number, t: ReturnType<typeof useTranslations<"common">>): string {
   const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("justNow");
+  if (minutes < 60) return t("minutesAgo", { Count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("hoursAgo", { Count: hours });
   const days = Math.round(hours / 24);
-  return `${days}d ago`;
+  return t("daysAgo", { Count: days });
 }

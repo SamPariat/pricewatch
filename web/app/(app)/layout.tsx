@@ -5,8 +5,10 @@ import { SidebarNav, BottomNav } from "@/components/nav-links";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/login/actions";
 import { cn } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 
 async function ChannelPill() {
+  const t = await getTranslations("channel");
   let status: "linked" | "disconnected" = "disconnected";
   try {
     status = (await api.getChannelStatus()).status;
@@ -19,14 +21,13 @@ async function ChannelPill() {
       <span
         className={cn("size-1.5 shrink-0 rounded-full", status === "linked" ? "bg-success" : "bg-muted-foreground")}
       />
-      <span className="text-xs font-medium">
-        {status === "linked" ? "Telegram connected" : "Telegram disconnected"}
-      </span>
+      <span className="text-xs font-medium">{status === "linked" ? t("connected") : t("disconnected")}</span>
     </div>
   );
 }
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const t = await getTranslations("nav");
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       {/* Desktop sidebar */}
@@ -42,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <ChannelPill />
         <form action={logout} className="mt-2">
           <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-            Sign out
+            {t("signOut")}
           </Button>
         </form>
       </aside>

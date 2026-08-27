@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { getLocale } from "next-intl/server";
 import { ApiClient, SESSION_COOKIE } from "./api";
 import { ConsoleLogger } from "./logger";
 
@@ -18,6 +19,7 @@ async function getCookie(): Promise<string | undefined> {
 export const api = new ApiClient({
   baseUrl: process.env.API_INTERNAL_URL ?? "http://app:8080",
   getCookie,
+  getLocale,
   logger: new ConsoleLogger(),
   fetchImpl: fetch,
 });

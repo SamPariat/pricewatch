@@ -8,12 +8,18 @@ type Settings struct {
 	QuietHoursEnd   string `json:"quiet_hours_end"`
 	Currency        string `json:"currency"`
 	DryRun          bool   `json:"dry_run"`
+	// Language is "en" or "hi" — see internal/i18n.Valid. Drives the
+	// Telegram digest/alert text; the panel's own UI language is a
+	// separate, purely client-side cookie (web/lib/i18n), though the
+	// language switcher keeps both in sync by PATCHing this field.
+	Language string `json:"language"`
 }
 
 func SettingsOf(s domain.Settings) Settings {
 	return Settings{
 		TelegramChatID: s.TelegramChatID, QuietHoursStart: s.QuietHoursStart,
 		QuietHoursEnd: s.QuietHoursEnd, Currency: s.Currency, DryRun: s.DryRun,
+		Language: s.Language,
 	}
 }
 
@@ -21,6 +27,7 @@ func (s Settings) ToDomain() domain.Settings {
 	return domain.Settings{
 		TelegramChatID: s.TelegramChatID, QuietHoursStart: s.QuietHoursStart,
 		QuietHoursEnd: s.QuietHoursEnd, Currency: s.Currency, DryRun: s.DryRun,
+		Language: s.Language,
 	}
 }
 

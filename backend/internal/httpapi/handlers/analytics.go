@@ -5,6 +5,7 @@ import (
 
 	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 // AnalyticsSummary godoc
@@ -17,9 +18,10 @@ import (
 // @Failure      500  {string}  string  "list watches"
 // @Router       /analytics/summary [get]
 func (a *API) AnalyticsSummary(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	summary, err := a.Analytics.Summary(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "list watches")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "analytics.summary_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, v1.AnalyticsSummary(summary), "analytics summary")
+	return envelope.Ok(c, fiber.StatusOK, v1.AnalyticsSummary(summary), i18n.T(loc, "analytics.summary_ok"))
 }
