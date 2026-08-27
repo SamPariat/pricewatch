@@ -20,7 +20,12 @@ services:
         max-file: "3"
 
   app:
-    build: ./backend
+    # Context is the repo root, not ./backend — both this image and
+    # web's need read access to the shared locales/ translation source
+    # at build/copy time (see backend/Dockerfile and web/Dockerfile).
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     ports:
       # Loopback-only — Caddy is the sole public entrypoint (see the
@@ -58,7 +63,9 @@ services:
         max-file: "3"
 
   web:
-    build: ./web
+    build:
+      context: .
+      dockerfile: web/Dockerfile
     restart: unless-stopped
     ports:
       # Loopback-only, same reasoning as app's port above — Caddy fronts

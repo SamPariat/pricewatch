@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { bodyPreview, type Logger } from "./logger";
 import type {
   AnalyticsSummary, ChannelStatus, DigestRun, Envelope, History, Meta,
@@ -48,6 +49,12 @@ export class ApiNetworkError extends ApiClientError {
 export interface ApiClientDeps {
   baseUrl: string;
   getCookie: () => Promise<string | undefined>;
+  // Forwarded as Accept-Language on every call so the backend's own
+  // i18n (backend/internal/i18n) renders envelope messages and
+  // validation errors in the same language as the panel — see
+  // next-intl/server's getLocale, which is what lib/container.ts wires
+  // in here (reading the same pw_locale cookie web/i18n/request.ts uses).
+  getLocale: () => Promise<string>;
   logger: Logger;
   fetchImpl: typeof fetch;
 }
@@ -66,6 +73,7 @@ export class ApiClient {
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const method = init?.method ?? "GET";
     const cookie = await this.deps.getCookie();
+    const locale = await this.deps.getLocale();
     const start = Date.now();
 
     let res: Response;
@@ -74,6 +82,7 @@ export class ApiClient {
         ...init,
         headers: {
           "Content-Type": "application/json",
+          "Accept-Language": locale,
           ...(cookie ? { Cookie: cookie } : {}),
           ...(init?.headers ?? {}),
         },
@@ -172,12 +181,14 @@ export class ApiClient {
   // stay owned by web/app/login/actions.ts, keeping this class a pure
   // network/protocol layer that isn't tied to one calling context.
   async login(password: string): Promise<{ cookieValue: string } | { error: string }> {
+    const locale = await this.deps.getLocale();
+    const t = await getTranslations({ locale, namespace: "errors" });
     const start = Date.now();
     let res: Response;
     try {
       res = await this.deps.fetchImpl(`${this.deps.baseUrl}/api/${API_VERSION}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Accept-Language": locale },
         body: JSON.stringify({ password }),
         cache: "no-store",
       });
@@ -186,7 +197,7 @@ export class ApiClient {
         duration_ms: Date.now() - start,
         error: err instanceof Error ? err.message : String(err),
       });
-      return { error: "Could not reach the server — try again." };
+      return { error: t("loginServerUnreachable") };
     }
     const duration_ms = Date.now() - start;
 
@@ -194,19 +205,19 @@ export class ApiClient {
       // Never log the password itself — only that an attempt was made
       // and rejected. Repeated hits here are the signal worth having.
       this.deps.logger.warn("login: rejected", { status: 401, duration_ms });
-      return { error: "Incorrect password." };
+      return { error: t("loginIncorrectPassword") };
     }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       this.deps.logger.warn("login: unexpected response", { status: res.status, duration_ms, body: bodyPreview(text) });
-      return { error: "Something went wrong — try again." };
+      return { error: t("loginSomethingWrong") };
     }
     this.deps.logger.info("login: succeeded", { duration_ms });
 
     const setCookies = res.headers.getSetCookie();
     const raw = setCookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`));
     if (!raw) {
-      return { error: "Login succeeded but no session was issued — try again." };
+      return { error: t("loginNoSession") };
     }
     return { cookieValue: raw.split(";")[0].slice(SESSION_COOKIE.length + 1) };
   }
@@ -215,6 +226,7 @@ export class ApiClient {
     const start = Date.now();
     const res = await this.deps.fetchImpl(`${this.deps.baseUrl}/api/${API_VERSION}/auth/logout`, {
       method: "POST",
+      headers: { "Accept-Language": await this.deps.getLocale() },
       cache: "no-store",
     });
     this.deps.logger.info("logout", { status: res.status, duration_ms: Date.now() - start });

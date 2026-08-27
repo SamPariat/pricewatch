@@ -84,6 +84,11 @@ export interface Settings {
   quiet_hours_end: string;
   currency: string;
   dry_run: boolean;
+  // "en" or "hi" — drives the Telegram digest/alert text (see
+  // backend/internal/i18n). The panel's own UI language is a separate,
+  // purely client-side cookie (lib/i18n), though the language switcher
+  // keeps both in sync by PATCHing this field.
+  language: string;
 }
 
 // Versioned by URL prefix (/api/v1/...) now, not header negotiation —

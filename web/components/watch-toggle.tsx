@@ -4,9 +4,11 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { toggleEnabledAction } from "@/app/(app)/watches/actions";
+import { useTranslations } from "next-intl";
 import type { Watch } from "@/lib/types";
 
 export function WatchToggle({ watch }: { watch: Watch }) {
+  const t = useTranslations("runNow");
   const [pending, startTransition] = useTransition();
 
   const onCheckedChange = (checked: boolean) => {
@@ -21,7 +23,7 @@ export function WatchToggle({ watch }: { watch: Watch }) {
           threshold_pct: watch.threshold_pct,
         }, checked);
       } catch {
-        toast.error("Failed to update watch");
+        toast.error(t("toggleFailed"));
       }
     });
   };

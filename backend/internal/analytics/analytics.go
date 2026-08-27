@@ -114,9 +114,22 @@ func AllTimeLowOf(samples []domain.PriceSample) AllTimeLow {
 	return AllTimeLow{PriceMinor: best.MinMinor, Date: best.SampleDate, OK: true}
 }
 
+// dateOnly truncates to a calendar day in UTC, regardless of t's own
+// Location. This must match price_samples.sample_date's own normalization:
+// it's a plain SQL `date` column, so Postgres discards time-of-day and any
+// offset entirely, and pgx always reconstructs it as UTC-located on read —
+// every domain.PriceSample.SampleDate that has round-tripped through the
+// database is UTC-located no matter what Location it was written with.
+// asOf, by contrast, is Clock.Now() fresh out of the process, in whatever
+// Location the process happens to run in. Preserving t.Location() here
+// (the previous behavior) compared those two under different Locations
+// whenever the process wasn't already running in UTC, which silently
+// broke latestOnOrBefore/sampleOnDate's day-equality checks — every delta,
+// rolling stat, and threshold alert would go quietly dark rather than
+// erroring, since Delta.OK simply stays false.
 func dateOnly(t time.Time) time.Time {
-	y, m, d := t.Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, t.Location())
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 func inWindow(samples []domain.PriceSample, days int, asOf time.Time) []domain.PriceSample {

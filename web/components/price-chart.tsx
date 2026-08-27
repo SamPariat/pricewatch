@@ -2,17 +2,22 @@
 
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { useLocale, useTranslations } from "next-intl";
 import type { PriceSample } from "@/lib/types";
 
-const chartConfig = {
-  median_minor: { label: "Median price", color: "var(--success)" },
-} satisfies ChartConfig;
-
 export function PriceChart({ samples, currency }: { samples: PriceSample[]; currency: string }) {
+  const t = useTranslations("chart");
+  const locale = useLocale();
+  const dateTag = locale === "hi" ? "hi-IN" : "en-US";
+
+  const chartConfig = {
+    median_minor: { label: t("medianPrice"), color: "var(--success)" },
+  } satisfies ChartConfig;
+
   if (samples.length === 0) {
     return (
       <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-        No price history yet
+        {t("noHistory")}
       </div>
     );
   }
@@ -35,7 +40,7 @@ export function PriceChart({ samples, currency }: { samples: PriceSample[]; curr
           axisLine={false}
           tickMargin={8}
           minTickGap={32}
-          tickFormatter={(v: string) => new Date(v + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+          tickFormatter={(v: string) => new Date(v + "T00:00:00Z").toLocaleDateString(dateTag, { month: "short", day: "numeric", timeZone: "UTC" })}
         />
         <YAxis
           tickLine={false}
@@ -47,7 +52,7 @@ export function PriceChart({ samples, currency }: { samples: PriceSample[]; curr
         <ChartTooltip
           content={
             <ChartTooltipContent
-              labelFormatter={(v) => new Date(String(v) + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+              labelFormatter={(v) => new Date(String(v) + "T00:00:00Z").toLocaleDateString(dateTag, { month: "short", day: "numeric", timeZone: "UTC" })}
               formatter={(value) => `${currency} ${Number(value).toLocaleString("en-US")}`}
             />
           }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { api } from "@/lib/container";
 import type { AssetKind, FlightParams, HotelParams, WatchInput } from "@/lib/types";
 
@@ -48,7 +49,7 @@ export async function createWatchAction(_prev: FormState, formData: FormData): P
     const watch = await api.createWatch(watchInputFromForm(formData));
     newId = watch.id;
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to create watch" };
+    return { error: err instanceof Error ? err.message : (await getTranslations("errors"))("createWatchFailed") };
   }
   revalidatePath("/watches");
   redirect(`/watches/${newId}`);
@@ -58,7 +59,7 @@ export async function updateWatchAction(id: string, _prev: FormState, formData: 
   try {
     await api.updateWatch(id, watchInputFromForm(formData));
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to update watch" };
+    return { error: err instanceof Error ? err.message : (await getTranslations("errors"))("updateWatchFailed") };
   }
   revalidatePath("/watches");
   revalidatePath(`/watches/${id}`);

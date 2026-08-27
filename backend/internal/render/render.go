@@ -17,6 +17,7 @@ import (
 
 	"github.com/SamPariat/pricewatch/internal/analytics"
 	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 // Analysis carries everything one watch's digest section needs — the
@@ -31,6 +32,14 @@ type Analysis struct {
 	PercentileOK bool
 	AllTimeLow   analytics.AllTimeLow
 	FetchedAt    string // RFC3339 — see PLAN.md § Freshness: always the real fetch time, never "now"
+
+	// Locale drives every piece of prose Digest renders — labels, the
+	// up/down word, the nearest-match note. Zero value ("") is treated
+	// as English by i18n.T, so existing callers that never set this
+	// still render exactly as before. Sourced from Settings.Language,
+	// not a request header — the digest is cron-triggered, not part of
+	// an HTTP request.
+	Locale i18n.Locale
 
 	// NearestMatch is set only when no fare exactly matched the watch's
 	// configured dates and the pipeline fell back to the closest real one
@@ -50,30 +59,34 @@ type DateRange struct {
 func Digest(w domain.Watch, a Analysis) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "<b>%s</b>\n", title(w))
+	fmt.Fprintf(&b, "<b>%s</b>\n", title(w, a.Locale))
 	fmt.Fprintf(&b, "<code>%s</code>", formatPrice(a.PriceMinor, a.Currency))
 
 	if a.Delta.OK {
-		arrow, word := "▲", "up"
+		arrow, wordKey := "▲", "digest.up"
 		if a.Delta.Pct < 0 {
-			arrow, word = "▼", "down"
+			arrow, wordKey = "▼", "digest.down"
 		}
-		fmt.Fprintf(&b, "  %s %.1f%% (%s vs yesterday)", arrow, absF(a.Delta.Pct), word)
+		word := i18n.T(a.Locale, wordKey)
+		pct := fmt.Sprintf("%.1f", absF(a.Delta.Pct))
+		fmt.Fprintf(&b, "  %s", i18n.T(a.Locale, "digest.delta", "Arrow", arrow, "Pct", pct, "Word", word))
 	}
 	b.WriteString("\n")
 
 	if a.PercentileOK {
-		fmt.Fprintf(&b, "Cheaper than %.0f%% of the last 90 days\n", a.Percentile)
+		pct := fmt.Sprintf("%.0f", a.Percentile)
+		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.cheaper_than_pct", "Pct", pct))
 	}
 	if a.AllTimeLow.OK && a.AllTimeLow.PriceMinor < a.PriceMinor {
-		fmt.Fprintf(&b, "All-time low: <code>%s</code> on %s\n", formatPrice(a.AllTimeLow.PriceMinor, a.Currency), a.AllTimeLow.Date.Format("Jan 2"))
+		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.all_time_low",
+			"Price", formatPrice(a.AllTimeLow.PriceMinor, a.Currency), "Date", a.AllTimeLow.Date.Format("Jan 2")))
 	}
 	if a.NearestMatch != (DateRange{}) {
 		dates := displayDate(a.NearestMatch.Depart)
 		if a.NearestMatch.Return != "" {
 			dates += " → " + displayDate(a.NearestMatch.Return)
 		}
-		fmt.Fprintf(&b, "⚠️ No exact match — nearest fare found is %s\n", dates)
+		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.no_exact_match", "Dates", dates))
 	}
 
 	return strings.TrimRight(b.String(), "\n")
@@ -85,16 +98,17 @@ func Digest(w domain.Watch, a Analysis) string {
 // with the real Telegram adapter (PLAN.md Phase 6), which is also where
 // the truncation would need to become multiple Send calls rather than a
 // silently-cut message.
-func CombineDigest(sections []string) string {
-	header := fmt.Sprintf("<b>Daily digest</b> — %d watch", len(sections))
-	if len(sections) != 1 {
-		header += "es"
+func CombineDigest(sections []string, loc i18n.Locale) string {
+	key := "digest.header_plural"
+	if len(sections) == 1 {
+		key = "digest.header_singular"
 	}
+	header := fmt.Sprintf("<b>%s</b>", i18n.T(loc, key, "Count", len(sections)))
 	parts := append([]string{header}, sections...)
 	return strings.Join(parts, "\n\n")
 }
 
-func title(w domain.Watch) string {
+func title(w domain.Watch, loc i18n.Locale) string {
 	if w.Name != "" {
 		return w.Name
 	}
@@ -102,9 +116,9 @@ func title(w domain.Watch) string {
 	case w.Kind.IsFlight():
 		if p, err := w.DecodeFlightParams(); err == nil {
 			if p.ReturnDate != nil {
-				return fmt.Sprintf("%s → %s · return", p.Origin, p.Destination)
+				return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_return"))
 			}
-			return fmt.Sprintf("%s → %s · one-way", p.Origin, p.Destination)
+			return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_oneway"))
 		}
 	case w.Kind == domain.AssetHotel, w.Kind == domain.AssetRental:
 		if p, err := w.DecodeHotelParams(); err == nil {

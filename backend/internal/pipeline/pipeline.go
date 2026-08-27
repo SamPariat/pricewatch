@@ -13,6 +13,7 @@ import (
 	"github.com/SamPariat/pricewatch/internal/ai"
 	"github.com/SamPariat/pricewatch/internal/analytics"
 	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/logging"
 	"github.com/SamPariat/pricewatch/internal/providers"
 	"github.com/SamPariat/pricewatch/internal/render"
@@ -29,6 +30,17 @@ type Pipeline struct {
 	Copywriter *ai.Copywriter
 }
 
+// RunResult is RunWatch's outcome. ThresholdBreach tells the caller
+// (scheduler.fireGroup) whether this run's price drop met or exceeded
+// the watch's own ThresholdPct — see PLAN.md § Further suggestions,
+// "threshold alerts on top of the daily digest, a drop past threshold_pct
+// pings immediately." A zero ThresholdPct means the watch has no
+// threshold configured, so ThresholdBreach is always false for it.
+type RunResult struct {
+	Text            string
+	ThresholdBreach bool
+}
+
 // RunWatch runs the full pipeline for one watch. runID is minted by the
 // caller (the scheduler, per PLAN.md Phase 4) and threaded through ctx by
 // the caller too, so every log line and every run_events row this method
@@ -37,33 +49,33 @@ type Pipeline struct {
 // It always writes a digest_runs row and updates watch_state — success or
 // failure — so "why didn't the digest arrive" is answerable from data,
 // even when this returns an error.
-func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Watch) (string, error) {
+func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Watch) (RunResult, error) {
 	started := p.Clock.Now()
 	if err := p.Repo.CreateDigestRun(ctx, domain.DigestRun{
 		RunID: runID, WatchID: w.ID, StartedAt: started, Status: domain.RunPending,
 	}); err != nil {
-		return "", fmt.Errorf("pipeline: create digest run: %w", err)
+		return RunResult{}, fmt.Errorf("pipeline: create digest run: %w", err)
 	}
 
 	provider, err := p.Registry.For(w.Kind)
 	if err != nil {
-		return "", p.fail(ctx, runID, w, "fetch", err)
+		return RunResult{}, p.fail(ctx, runID, w, "fetch", err)
 	}
 
 	p.emit(ctx, runID, "fetch", domain.LevelInfo, "starting fetch", nil)
 	quotes, err := provider.Fetch(ctx, w)
 	if err != nil {
-		return "", p.fail(ctx, runID, w, "fetch", err)
+		return RunResult{}, p.fail(ctx, runID, w, "fetch", err)
 	}
 	p.emit(ctx, runID, "fetch", domain.LevelInfo, fmt.Sprintf("fetched %d quotes", len(quotes)), nil)
 
 	if err := p.Repo.InsertQuotes(ctx, quotes); err != nil {
-		return "", p.fail(ctx, runID, w, "persist", err)
+		return RunResult{}, p.fail(ctx, runID, w, "persist", err)
 	}
 
 	sample, match, ok := rollupForWatch(w, quotes, started)
 	if !ok {
-		return "", p.fail(ctx, runID, w, "normalize",
+		return RunResult{}, p.fail(ctx, runID, w, "normalize",
 			fmt.Errorf("no quote in this fetch was within %d days of the watch's configured dates", maxDateDriftDays))
 	}
 	if !match.Exact {
@@ -72,13 +84,13 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 				match.MatchedDepart, match.MatchedReturn, match.ConfiguredDepart, match.ConfiguredReturn), nil)
 	}
 	if err := p.Repo.UpsertPriceSample(ctx, sample); err != nil {
-		return "", p.fail(ctx, runID, w, "persist", err)
+		return RunResult{}, p.fail(ctx, runID, w, "persist", err)
 	}
 	p.emit(ctx, runID, "normalize", domain.LevelInfo, "price sample upserted", nil)
 
 	samples, err := p.Repo.ListPriceSamples(ctx, w.ID, started.AddDate(0, 0, -95))
 	if err != nil {
-		return "", p.fail(ctx, runID, w, "analyze", err)
+		return RunResult{}, p.fail(ctx, runID, w, "analyze", err)
 	}
 
 	pct, pctOK := analytics.PercentileRank(samples, sample.MinMinor, 90, started)
@@ -90,6 +102,7 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 		PercentileOK: pctOK,
 		AllTimeLow:   analytics.AllTimeLowOf(samples),
 		FetchedAt:    started.Format(time.RFC3339),
+		Locale:       i18n.From(ctx),
 	}
 	if !match.Exact {
 		analysis.NearestMatch = render.DateRange{Depart: match.MatchedDepart, Return: match.MatchedReturn}
@@ -112,7 +125,16 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 		logging.From(ctx).Error().Err(err).Msg("pipeline: finish digest run after success")
 	}
 
-	return text, nil
+	// A negative Pct is a price drop (see render.Digest's arrow/word
+	// choice, same sign convention). ThresholdPct == 0 means the watch
+	// has no threshold configured, so it can never breach.
+	breach := w.ThresholdPct > 0 && analysis.Delta.OK && analysis.Delta.Pct <= -w.ThresholdPct
+	if breach {
+		p.emit(ctx, runID, "analyze", domain.LevelInfo,
+			fmt.Sprintf("threshold breached: price dropped %.1f%%, watch threshold is %.1f%%", -analysis.Delta.Pct, w.ThresholdPct), nil)
+	}
+
+	return RunResult{Text: text, ThresholdBreach: breach}, nil
 }
 
 // fail records a failed run — a bad watch_state and digest_runs row, not

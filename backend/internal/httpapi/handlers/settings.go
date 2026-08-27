@@ -5,6 +5,7 @@ import (
 
 	"github.com/SamPariat/pricewatch/internal/httpapi/envelope"
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 // GetSettings godoc
@@ -16,11 +17,12 @@ import (
 // @Failure  500  {string}  string  "get settings"
 // @Router   /settings [get]
 func (a *API) GetSettings(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	s, err := a.Settings.Get(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "get settings")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "settings.get_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(s), "settings")
+	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(s), i18n.T(loc, "settings.get_ok"))
 }
 
 // UpdateSettings godoc
@@ -36,15 +38,16 @@ func (a *API) GetSettings(c fiber.Ctx) error {
 // @Failure      500   {string}  string  "update settings"
 // @Router       /settings [patch]
 func (a *API) UpdateSettings(c fiber.Ctx) error {
+	loc := i18n.From(c)
 	var req v1.Settings
 	if err := c.Bind().Body(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+		return fiber.NewError(fiber.StatusBadRequest, i18n.T(loc, "common.invalid_body"))
 	}
 	saved, err := a.Settings.Update(c, req.ToDomain())
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "update settings")
+		return fiber.NewError(fiber.StatusInternalServerError, i18n.T(loc, "settings.update_failed"))
 	}
-	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(saved), "settings updated")
+	return envelope.Ok(c, fiber.StatusOK, v1.SettingsOf(saved), i18n.T(loc, "settings.update_ok"))
 }
 
 // GetMeta godoc
@@ -55,5 +58,5 @@ func (a *API) UpdateSettings(c fiber.Ctx) error {
 // @Success      200  {object}  v1.Meta
 // @Router       /meta [get]
 func (a *API) GetMeta(c fiber.Ctx) error {
-	return envelope.Ok(c, fiber.StatusOK, v1.Meta{CurrentVersion: APIVersion, SupportedVersions: []string{APIVersion}}, "ok")
+	return envelope.Ok(c, fiber.StatusOK, v1.Meta{CurrentVersion: APIVersion, SupportedVersions: []string{APIVersion}}, i18n.T(i18n.From(c), "meta.ok"))
 }

@@ -13,8 +13,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { deleteWatchAction } from "@/app/(app)/watches/actions";
+import { useTranslations } from "next-intl";
 
 export function DeleteWatchButton({ watchId, watchName }: { watchId: string; watchName: string }) {
+  const t = useTranslations("deleteDialog");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -23,26 +25,24 @@ export function DeleteWatchButton({ watchId, watchName }: { watchId: string; wat
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
           <Trash2 className="size-3.5" />
-          Delete
+          {t("trigger")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete watch?</DialogTitle>
-          <DialogDescription>
-            This permanently removes &quot;{watchName || "this watch"}&quot; and its price history. This can&apos;t be undone.
-          </DialogDescription>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>{t("description", { Name: watchName || t("fallbackName") })}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             variant="destructive"
             disabled={pending}
             onClick={() => startTransition(() => deleteWatchAction(watchId))}
           >
-            {pending ? "Deleting…" : "Delete"}
+            {pending ? t("deleting") : t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

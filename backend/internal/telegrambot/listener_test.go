@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SamPariat/pricewatch/internal/domain"
+	"github.com/SamPariat/pricewatch/internal/i18n"
 	"github.com/SamPariat/pricewatch/internal/notify/telegram"
 	"github.com/SamPariat/pricewatch/internal/pipeline"
 	"github.com/SamPariat/pricewatch/internal/providers"
@@ -89,7 +90,7 @@ func TestSnooze_SetsSnoozedUntil(t *testing.T) {
 	repo.SeedWatch(w)
 	l := newTestListener(t, repo)
 
-	msg := l.snooze(context.Background(), w.ID)
+	msg := l.snooze(context.Background(), w.ID, i18n.EN)
 	if msg == "" {
 		t.Error("expected a non-empty confirmation message")
 	}
@@ -120,7 +121,7 @@ func TestPause_DisablesWatchAndReloadsScheduler(t *testing.T) {
 		t.Fatal("expected the watch to be scheduled before pausing")
 	}
 
-	l.pause(context.Background(), w.ID)
+	l.pause(context.Background(), w.ID, i18n.EN)
 
 	updated, err := repo.GetWatch(context.Background(), w.ID)
 	if err != nil {
@@ -138,7 +139,7 @@ func TestPause_UnknownWatch_ReturnsMessageWithoutPanicking(t *testing.T) {
 	repo := storetest.New()
 	l := newTestListener(t, repo)
 
-	msg := l.pause(context.Background(), "does-not-exist")
+	msg := l.pause(context.Background(), "does-not-exist", i18n.EN)
 	if msg == "" {
 		t.Error("expected a non-empty message for an unknown watch")
 	}
@@ -151,7 +152,7 @@ func TestRefresh_DryRun_RunsPipelineButDoesNotSend(t *testing.T) {
 	repo.UpdateSettings(context.Background(), domain.Settings{DryRun: true, TelegramChatID: "chat1", Currency: "INR"})
 	l := newTestListener(t, repo)
 
-	msg := l.refresh(context.Background(), w.ID)
+	msg := l.refresh(context.Background(), w.ID, i18n.EN)
 	if msg == "" {
 		t.Error("expected a non-empty confirmation message")
 	}
@@ -169,7 +170,7 @@ func TestRefresh_UnknownWatch_ReturnsMessage(t *testing.T) {
 	repo := storetest.New()
 	l := newTestListener(t, repo)
 
-	msg := l.refresh(context.Background(), "does-not-exist")
+	msg := l.refresh(context.Background(), "does-not-exist", i18n.EN)
 	if msg == "" {
 		t.Error("expected a non-empty message for an unknown watch")
 	}

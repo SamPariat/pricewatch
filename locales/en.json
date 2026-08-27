@@ -1,0 +1,237 @@
+{
+  "backend": {
+    "common": {
+      "invalid_body": "invalid request body",
+      "not_authenticated": "not authenticated",
+      "internal_error": "internal server error",
+      "not_found": "not found"
+    },
+    "watches": {
+      "list_failed": "list watches",
+      "listed": "watches listed",
+      "not_found": "watch not found",
+      "found": "watch found",
+      "create_failed": "create watch",
+      "created": "watch created",
+      "update_failed": "update watch",
+      "updated": "watch updated",
+      "run_started": "watch run started",
+      "run_failed": "run failed",
+      "history_failed": "list price samples",
+      "history": "history"
+    },
+    "settings": {
+      "get_failed": "get settings",
+      "get_ok": "settings",
+      "update_failed": "update settings",
+      "update_ok": "settings updated"
+    },
+    "meta": {
+      "ok": "ok"
+    },
+    "auth": {
+      "invalid_password": "invalid password"
+    },
+    "channel": {
+      "check_failed": "check channel status",
+      "status_ok": "channel status"
+    },
+    "runs": {
+      "list_failed": "list runs",
+      "listed": "runs listed",
+      "events_failed": "list run events",
+      "events_ok": "run events"
+    },
+    "analytics": {
+      "summary_failed": "list watches",
+      "summary_ok": "analytics summary"
+    },
+    "validation": {
+      "invalid_kind": "invalid kind \"{Kind}\"",
+      "invalid_cron": "invalid cron_expr: {Error}",
+      "invalid_timezone": "invalid timezone: {Error}",
+      "invalid_params": "invalid params for kind \"{Kind}\": {Error}",
+      "missing_flight_fields": "invalid params for kind \"{Kind}\": origin, destination, and depart_date are required",
+      "missing_return_date": "invalid params for kind \"{Kind}\": return_date is required",
+      "missing_hotel_fields": "invalid params for kind \"{Kind}\": location, check_in, and check_out are required"
+    },
+    "digest": {
+      "header_singular": "Daily digest — {Count} watch",
+      "header_plural": "Daily digest — {Count} watches",
+      "up": "up",
+      "down": "down",
+      "delta": "{Arrow} {Pct}% ({Word} vs yesterday)",
+      "cheaper_than_pct": "Cheaper than {Pct}% of the last 90 days",
+      "all_time_low": "All-time low: {Price} on {Date}",
+      "no_exact_match": "⚠️ No exact match — nearest fare found is {Dates}",
+      "flight_return": "· return",
+      "flight_oneway": "· one-way"
+    },
+    "alert": {
+      "threshold_header": "🔔 Threshold alert"
+    },
+    "telegram": {
+      "snoozed": "Snoozed for 7 days.",
+      "snooze_failed": "Failed to snooze — try again from the panel.",
+      "watch_not_found": "Watch not found.",
+      "pause_failed": "Failed to pause — try again from the panel.",
+      "paused": "Paused. Re-enable it from the panel when you're ready.",
+      "refresh_failed": "Refresh failed — check the run log in the panel.",
+      "refreshed": "Refreshed."
+    }
+  },
+  "nav": {
+    "watches": "Watches",
+    "runs": "Runs",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "channel": {
+    "connected": "Telegram connected",
+    "disconnected": "Telegram disconnected"
+  },
+  "common": {
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "edit": "Edit",
+    "never": "Never updated",
+    "unknown": "Unknown",
+    "justNow": "just now",
+    "minutesAgo": "{Count}m ago",
+    "hoursAgo": "{Count}h ago",
+    "daysAgo": "{Count}d ago"
+  },
+  "login": {
+    "title": "Pricewatch",
+    "subtitle": "Sign in to manage your watches",
+    "passwordLabel": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in"
+  },
+  "watches": {
+    "title": "Watches",
+    "active": "active",
+    "needsAttention": "needs attention",
+    "newWatch": "New watch",
+    "emptyText": "No watches yet — add one to start tracking prices.",
+    "kpiActive": "Active watches",
+    "kpiAvgChange7d": "Avg change, 7d",
+    "kpiTotal": "Total watches",
+    "kpiNeedsAttention": "Needs attention",
+    "colWatch": "Watch",
+    "colPrice": "Price",
+    "colDelta": "Δ vs yesterday",
+    "colUpdated": "Updated",
+    "colStatus": "Status",
+    "statusOk": "OK",
+    "updatedPrefix": "Updated"
+  },
+  "watchDetail": {
+    "edit": "Edit",
+    "updatedPrefix": "Updated",
+    "nextCheckPrefix": "next check",
+    "indicativeNotice": "Prices are indicative, not bookable — confirm on the provider before booking.",
+    "cheapestNow": "Cheapest right now",
+    "cheaperThanPct": "Cheaper than {Pct}% of the last 90 days",
+    "stat7dLow": "7D low",
+    "stat30dMedian": "30D median",
+    "statAllTimeLow": "All-time low",
+    "watchEnabled": "Watch enabled",
+    "dailyAt": "Daily at {Time} ({Tz})"
+  },
+  "watchForm": {
+    "typeLabel": "Type",
+    "kindOneWay": "One-way",
+    "kindReturn": "Return",
+    "kindHotel": "Hotel",
+    "kindRental": "Rental",
+    "originLabel": "Origin (IATA)",
+    "destinationLabel": "Destination (IATA)",
+    "departDateLabel": "Depart date",
+    "returnDateLabel": "Return date",
+    "locationLabel": "Location",
+    "checkInLabel": "Check-in",
+    "checkOutLabel": "Check-out",
+    "hourLabel": "Check time (hour)",
+    "minuteLabel": "Check time (minute)",
+    "timezoneLabel": "Timezone",
+    "thresholdLabel": "Alert threshold (% drop)",
+    "nameLabel": "Name (optional)",
+    "namePlaceholder": "Goa return in December",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "saveWatch": "Save watch"
+  },
+  "newWatch": {
+    "title": "New watch",
+    "subtitle": "Track a flight, hotel, or rental's price over time."
+  },
+  "editWatch": {
+    "title": "Edit watch"
+  },
+  "deleteDialog": {
+    "trigger": "Delete",
+    "title": "Delete watch?",
+    "description": "This permanently removes \"{Name}\" and its price history. This can't be undone.",
+    "fallbackName": "this watch",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "deleting": "Deleting…"
+  },
+  "runNow": {
+    "idle": "Run now",
+    "running": "Running…",
+    "done": "Done",
+    "successTitle": "Run complete",
+    "successDesc": "Price and chart refreshed.",
+    "failTitle": "Run failed",
+    "failDesc": "Check the run log for details.",
+    "toggleFailed": "Failed to update watch"
+  },
+  "runs": {
+    "title": "Run history",
+    "subtitle": "Every fetch, in order — success or failure.",
+    "empty": "No runs yet.",
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "runDetail": {
+    "title": "Run timeline",
+    "empty": "No events recorded for this run."
+  },
+  "settings": {
+    "title": "Settings",
+    "telegramSection": "Telegram",
+    "chatIdLabel": "Chat ID",
+    "chatIdHelp": "Add the bot to your group, then find its chat ID via the Bot API's getUpdates endpoint.",
+    "notificationsSection": "Notifications",
+    "quietStartLabel": "Quiet hours start",
+    "quietEndLabel": "Quiet hours end",
+    "dataSection": "Data",
+    "currencyLabel": "Default currency",
+    "dryRunLabel": "Dry-run mode",
+    "dryRunHelp": "Runs fetch and render but never sends to Telegram.",
+    "languageSection": "Language",
+    "languageLabel": "App and digest language",
+    "languageHelp": "Changes both this panel's language and the language of the Telegram digest and alerts.",
+    "languageEnglish": "English",
+    "languageHindi": "हिन्दी (Hindi)",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "failedToSave": "Failed to save settings"
+  },
+  "errors": {
+    "createWatchFailed": "Failed to create watch",
+    "updateWatchFailed": "Failed to update watch",
+    "loginServerUnreachable": "Could not reach the server — try again.",
+    "loginIncorrectPassword": "Incorrect password.",
+    "loginSomethingWrong": "Something went wrong — try again.",
+    "loginNoSession": "Login succeeded but no session was issued — try again."
+  },
+  "chart": {
+    "noHistory": "No price history yet",
+    "medianPrice": "Median price"
+  }
+}

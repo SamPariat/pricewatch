@@ -8,4 +8,10 @@ type Settings struct {
 	QuietHoursEnd   string // "06:30"
 	Currency        string
 	DryRun          bool
+	// Language drives the Telegram digest/alert text (internal/render,
+	// internal/telegrambot) — those are cron- and callback-triggered, not
+	// HTTP requests, so there's no Accept-Language header to read; this
+	// persisted preference is their only source of locale. See
+	// internal/i18n.Valid for what "hi"/"en" mean.
+	Language string
 }

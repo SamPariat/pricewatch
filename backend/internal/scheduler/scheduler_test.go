@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -122,6 +123,19 @@ func (p *succeedingProvider) Fetch(ctx context.Context, w domain.Watch) ([]domai
 	return []domain.Quote{{WatchID: w.ID, PriceMinor: 800000, DepartDate: "2026-12-10", Fingerprint: "a"}}, nil
 }
 
+// priceProvider is succeedingProvider with a caller-chosen price, used by
+// the threshold-alert tests to produce a specific-size drop against a
+// seeded prior-day sample.
+type priceProvider struct {
+	kind       domain.AssetKind
+	priceMinor int64
+}
+
+func (p *priceProvider) Kind() domain.AssetKind { return p.kind }
+func (p *priceProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quote, error) {
+	return []domain.Quote{{WatchID: w.ID, PriceMinor: p.priceMinor, DepartDate: "2026-12-10", Fingerprint: "a"}}, nil
+}
+
 func TestFireGroup_SingleWatch_AttachesSnoozeButtons(t *testing.T) {
 	repo := storetest.New()
 	w := flightWatch(t, "solo", "0 7 * * *")
@@ -211,6 +225,79 @@ func TestFireGroup_ExpiredSnooze_StillRuns(t *testing.T) {
 
 	if len(notifier.sent) != 1 {
 		t.Errorf("expected the watch to run once its snooze has lapsed, got %d sends", len(notifier.sent))
+	}
+}
+
+// TestFireGroup_ThresholdBreach_SendsExtraAlert seeds yesterday's price so
+// today's fetch registers as a real drop, then asserts the breached watch
+// gets its own alert message on top of (not instead of) the normal
+// digest send — see pipeline.RunResult.ThresholdBreach's doc comment.
+func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
+	repo := storetest.New()
+	// A fixed UTC time, not time.Now() — rollupForWatch always stamps a
+	// fresh sample's SampleDate in time.UTC, and dateOnly() (which the
+	// delta comparison uses) preserves whatever Location the seeded
+	// sample was given, so a Location mismatch here would make the
+	// "yesterday" sample invisible to DeltaVsYesterday on any machine
+	// not already running in UTC.
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t, "cheap", "0 7 * * *")
+	w.ThresholdPct = 10
+	repo.SeedWatch(w)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
+		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&priceProvider{kind: domain.AssetFlightOneWay, priceMinor: 500000}) // 50% drop
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w})
+
+	if len(notifier.sent) != 2 {
+		t.Fatalf("got %d sends, want 2 (threshold alert + digest)", len(notifier.sent))
+	}
+	if !strings.Contains(notifier.sent[0].Text, "Threshold alert") {
+		t.Errorf("expected the first send to be the threshold alert, got: %q", notifier.sent[0].Text)
+	}
+	if len(notifier.sent[0].Buttons) == 0 {
+		t.Error("expected snooze/pause/refresh buttons on the threshold alert")
+	}
+	if strings.Contains(notifier.sent[1].Text, "Threshold alert") {
+		t.Errorf("expected the second send to be the normal digest, got: %q", notifier.sent[1].Text)
+	}
+}
+
+// TestFireGroup_NoThreshold_SendsOnlyDigest is the control for the test
+// above: with no ThresholdPct configured, the same 50% drop must not
+// produce an extra alert send.
+func TestFireGroup_NoThreshold_SendsOnlyDigest(t *testing.T) {
+	repo := storetest.New()
+	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
+	w := flightWatch(t, "no-threshold", "0 7 * * *") // ThresholdPct left at zero value
+	repo.SeedWatch(w)
+	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
+		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	registry := providers.NewRegistry()
+	registry.Register(&priceProvider{kind: domain.AssetFlightOneWay, priceMinor: 500000})
+	p := &pipeline.Pipeline{Registry: registry, Repo: repo, Clock: fixedClock{now}}
+	notifier := &recordingNotifier{}
+	s := New(repo, p, notifier)
+
+	s.fireGroup(context.Background(), []domain.Watch{w})
+
+	if len(notifier.sent) != 1 {
+		t.Fatalf("got %d sends, want 1 (digest only — no threshold configured)", len(notifier.sent))
 	}
 }
 

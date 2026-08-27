@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/SamPariat/pricewatch/internal/i18n"
 )
 
 const SessionCookie = "pw_session"
@@ -72,7 +74,7 @@ func RequireAuth(sess *Session) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		token := c.Cookies(SessionCookie)
 		if token == "" || !sess.Valid(token) {
-			return fiber.NewError(fiber.StatusUnauthorized, "not authenticated")
+			return fiber.NewError(fiber.StatusUnauthorized, i18n.T(i18n.From(c), "common.not_authenticated"))
 		}
 		return c.Next()
 	}

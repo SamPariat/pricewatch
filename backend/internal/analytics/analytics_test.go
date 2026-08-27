@@ -34,6 +34,33 @@ func TestDeltaVsYesterday(t *testing.T) {
 	}
 }
 
+// TestDeltaVsYesterday_AsOfInNonUTCLocation_StillMatches is a regression
+// test for a real bug: dateOnly used to preserve whatever Location the
+// time it was given already carried. price_samples.sample_date is a
+// plain SQL `date` column, so every sample that has round-tripped through
+// Postgres comes back UTC-located regardless of what Location it was
+// written with (see dateOnly's doc comment) — but asOf is Clock.Now(),
+// fresh out of the process, in whatever Location the process runs in.
+// Comparing a UTC-located sample against a non-UTC-located asOf under the
+// old preserve-Location behavior silently produced OK=false: not a crash,
+// just deltas, rolling stats, and (now) threshold alerts going dark.
+func TestDeltaVsYesterday_AsOfInNonUTCLocation_StillMatches(t *testing.T) {
+	ist := time.FixedZone("IST", 5*60*60+30*60)
+	asOf := base.In(ist).Add(4 * time.Minute) // same instant as base, just past local midnight
+
+	samples := []domain.PriceSample{
+		sample(1, 9800, 10000, 10500), // UTC-located, as if read back from Postgres
+		sample(0, 9300, 9500, 10100),
+	}
+	got := DeltaVsYesterday(samples, asOf)
+	if !got.OK {
+		t.Fatalf("expected OK=true regardless of asOf's Location, got %+v", got)
+	}
+	if got.Pct != -5.0 {
+		t.Errorf("Pct = %v, want -5.0", got.Pct)
+	}
+}
+
 func TestDeltaVsYesterday_NoPriorDay(t *testing.T) {
 	samples := []domain.PriceSample{sample(0, 9300, 9500, 10100)}
 	got := DeltaVsYesterday(samples, base)
