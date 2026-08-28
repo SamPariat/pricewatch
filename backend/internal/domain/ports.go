@@ -59,6 +59,23 @@ type Repository interface {
 
 	GetSettings(ctx context.Context) (Settings, error)
 	UpdateSettings(ctx context.Context, s Settings) error
+
+	CreateTrip(ctx context.Context, t Trip) (Trip, error)
+	GetTrip(ctx context.Context, id TripID) (Trip, error)
+	ListTrips(ctx context.Context) ([]Trip, error)
+	UpdateTrip(ctx context.Context, t Trip) (Trip, error)
+	// DeleteTrip cascade-deletes every leg (Watch) that belongs to it —
+	// see the trips/watches.trip_id migration's ON DELETE CASCADE.
+	DeleteTrip(ctx context.Context, id TripID) error
+
+	CreateRequest(ctx context.Context, r Request) (Request, error)
+	GetRequest(ctx context.Context, id RequestID) (Request, error)
+	// ListRequests filters by status; pass "" for every request regardless
+	// of status.
+	ListRequests(ctx context.Context, status RequestStatus) ([]Request, error)
+	// ResolveRequest sets status and ResolvedAt = now. It does not apply
+	// the request's underlying action — see service.RequestService.Approve.
+	ResolveRequest(ctx context.Context, id RequestID, status RequestStatus) error
 }
 
 // Loader produces the bytes to cache on a miss — typically a Provider.Fetch

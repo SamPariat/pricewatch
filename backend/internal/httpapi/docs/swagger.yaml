@@ -73,6 +73,21 @@ definitions:
       price_minor:
         type: integer
     type: object
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Request:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      resolved_at:
+        type: string
+      status:
+        type: string
+    type: object
   github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent:
     properties:
       at:
@@ -108,13 +123,33 @@ definitions:
       quiet_hours_start:
         type: string
     type: object
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip:
+    properties:
+      created_at:
+        type: string
+      cron_expr:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      legs:
+        description: |-
+          Legs is populated by the list/get handler from a separate
+          ListWatches call — Trip itself carries no leg data.
+        items:
+          $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch'
+        type: array
+      name:
+        type: string
+      timezone:
+        type: string
+    type: object
   github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch:
     properties:
       consecutive_failures:
         type: integer
       created_at:
-        type: string
-      cron_expr:
         type: string
       enabled:
         type: boolean
@@ -140,7 +175,7 @@ definitions:
         type: boolean
       threshold_pct:
         type: number
-      timezone:
+      trip_id:
         type: string
     type: object
   internal_httpapi_handlers.channelStatusResponse:
@@ -160,10 +195,19 @@ definitions:
       message:
         type: string
     type: object
-  internal_httpapi_handlers.watchRequest:
+  internal_httpapi_handlers.tripRequest:
     properties:
       cron_expr:
         type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      timezone:
+        type: string
+    type: object
+  internal_httpapi_handlers.watchRequest:
+    properties:
       enabled:
         type: boolean
       kind:
@@ -176,7 +220,7 @@ definitions:
         type: array
       threshold_pct:
         type: number
-      timezone:
+      trip_id:
         type: string
     type: object
 info:
@@ -286,6 +330,73 @@ paths:
       summary: Supported API version
       tags:
       - meta
+  /requests:
+    get:
+      parameters:
+      - description: pending|approved|rejected — omit for all
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Request'
+            type: array
+      security:
+      - CookieAuth: []
+      summary: List Discord-submitted change requests
+      tags:
+      - requests
+  /requests/{id}/approve:
+    post:
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+        "400":
+          description: the underlying action failed validation — the request stays
+            pending
+          schema:
+            type: string
+        "404":
+          description: request not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Approve a pending request — applies it via the normal WatchService/TripService
+        methods
+      tags:
+      - requests
+  /requests/{id}/reject:
+    post:
+      parameters:
+      - description: Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: request not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Reject a pending request — no side effect beyond marking it rejected
+      tags:
+      - requests
   /runs:
     get:
       description: The 50 most recent runs across every watch, newest first — backs
@@ -386,6 +497,123 @@ paths:
       summary: Replace the singleton settings
       tags:
       - settings
+  /trips:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip'
+            type: array
+      security:
+      - CookieAuth: []
+      summary: List trips, each with its legs
+      tags:
+      - trips
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Trip fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi_handlers.tripRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip'
+        "400":
+          description: invalid request body, or a validation error naming the bad
+            field
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Create a trip
+      tags:
+      - trips
+  /trips/{id}:
+    delete:
+      parameters:
+      - description: Trip ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+        "404":
+          description: trip not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Delete a trip and every leg in it
+      tags:
+      - trips
+    get:
+      parameters:
+      - description: Trip ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip'
+        "404":
+          description: trip not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Get a trip and its legs
+      tags:
+      - trips
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Trip ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Full trip fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi_handlers.tripRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip'
+        "404":
+          description: trip not found
+          schema:
+            type: string
+      security:
+      - CookieAuth: []
+      summary: Replace a trip
+      tags:
+      - trips
   /watches:
     get:
       description: Every watch, each enriched with its current price, freshness, and

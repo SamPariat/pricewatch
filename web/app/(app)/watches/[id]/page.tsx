@@ -22,6 +22,7 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
     getTranslations("watchDetail"),
     getTranslations("watchForm"),
   ]);
+  const trip = await api.getTrip(watch.trip_id);
 
   const currency = watch.price?.currency ?? "INR";
   const low7d = rollingLow(history.samples, 7);
@@ -32,12 +33,14 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
     <div className="flex flex-col gap-6 p-5 md:mx-auto md:max-w-3xl md:p-8">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/watches" className="text-muted-foreground">
+          <Link href={`/trips/${trip.id}`} className="text-muted-foreground">
             <ArrowLeft className="size-4.5" />
           </Link>
           <div>
             <h1 className="text-lg font-bold tracking-tight md:text-[19px]">{watchTitle(watch, tForm)}</h1>
-            <p className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</p>
+            <p className="text-[12.5px] text-muted-foreground">
+              {trip.name} · {watchSubtitle(watch, tForm, locale)}
+            </p>
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
@@ -93,7 +96,7 @@ export default async function WatchDetailPage(props: PageProps<"/watches/[id]">)
       <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
         <div>
           <div className="text-[13.5px] font-medium">{t("watchEnabled")}</div>
-          <div className="text-[12px] text-muted-foreground">{t("dailyAt", { Time: formatCronTime(watch.cron_expr), Tz: watch.timezone })}</div>
+          <div className="text-[12px] text-muted-foreground">{t("dailyAt", { Time: formatCronTime(trip.cron_expr), Tz: trip.timezone })}</div>
         </div>
         <WatchToggle watch={watch} />
       </div>

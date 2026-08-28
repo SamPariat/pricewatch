@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Pricewatch",
     short_name: "Pricewatch",
     description: "Daily flight price tracking with Discord digests",
-    start_url: "/watches",
+    start_url: "/trips",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",

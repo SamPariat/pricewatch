@@ -122,13 +122,21 @@ func Digest(w domain.Watch, a Analysis) domain.Embed {
 // makes this trivial compared to the old Telegram HTML-string
 // concatenation this replaced: each watch keeps its own embed instead of
 // being flattened into shared text.
-func CombineDigest(embeds []domain.Embed, loc i18n.Locale) domain.Message {
+// CombineDigest builds the message for one trip's fire — all of its
+// legs' embeds in one Send call. tripName, when non-empty, replaces the
+// generic "Daily digest — N watches" header with "{Name} — N updates" so
+// the digest reads as belonging to that trip.
+func CombineDigest(embeds []domain.Embed, tripName string, loc i18n.Locale) domain.Message {
 	key := "digest.header_plural"
 	if len(embeds) == 1 {
 		key = "digest.header_singular"
 	}
+	content := i18n.T(loc, key, "Count", len(embeds))
+	if tripName != "" {
+		content = i18n.T(loc, "digest.header_trip", "Name", tripName, "Count", len(embeds))
+	}
 	return domain.Message{
-		Content: i18n.T(loc, key, "Count", len(embeds)),
+		Content: content,
 		Embeds:  embeds,
 	}
 }
@@ -142,6 +150,9 @@ func title(w domain.Watch, loc i18n.Locale) string {
 			return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_return"))
 		}
 		return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_oneway"))
+	}
+	if p, err := w.DecodeLodgingParams(); err == nil {
+		return fmt.Sprintf("%s (%s → %s)", i18n.T(loc, "digest.lodging_generic"), p.CheckIn, p.CheckOut)
 	}
 	return string(w.Kind)
 }

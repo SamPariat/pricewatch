@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutList, History, Settings } from "lucide-react";
+import { LayoutList, History, Settings, Inbox } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 function links(t: ReturnType<typeof useTranslations<"nav">>) {
   return [
-    { href: "/watches", label: t("watches"), icon: LayoutList },
+    { href: "/trips", label: t("trips"), icon: LayoutList },
+    { href: "/requests", label: t("requests"), icon: Inbox },
     { href: "/runs", label: t("runs"), icon: History },
     { href: "/settings", label: t("settings"), icon: Settings },
   ];

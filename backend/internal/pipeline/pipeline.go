@@ -38,7 +38,12 @@ type Pipeline struct {
 // pings immediately." A zero ThresholdPct means the watch has no
 // threshold configured, so ThresholdBreach is always false for it.
 type RunResult struct {
-	Embed           domain.Embed
+	Embed domain.Embed
+	// ImagePNG is a price-history chart, nil when there weren't enough
+	// samples to plot one (render.Chart errors on zero samples) — a
+	// charting failure never fails the run, since the digest text is
+	// still valuable without the image.
+	ImagePNG        []byte
 	ThresholdBreach bool
 }
 
@@ -114,6 +119,14 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 	embed = p.Copywriter.Enhance(ctx, w, analysis, embed)
 	p.emit(ctx, runID, "render", domain.LevelInfo, "section rendered", nil)
 
+	// A charting failure (too few samples, most commonly a brand-new
+	// watch) never fails the run — imagePNG just stays nil and the
+	// digest ships as text-only, same as before this existed.
+	imagePNG, cerr := render.Chart(samples, analysis.Currency)
+	if cerr != nil {
+		imagePNG = nil
+	}
+
 	now := p.Clock.Now()
 	if err := p.Repo.UpsertWatchState(ctx, domain.WatchState{
 		WatchID: w.ID, LastSuccessAt: &now, LastAttemptAt: &now, LastError: "", ConsecutiveFailures: 0,
@@ -135,7 +148,7 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 			fmt.Sprintf("threshold breached: price dropped %.1f%%, watch threshold is %.1f%%", -analysis.Delta.Pct, w.ThresholdPct), nil)
 	}
 
-	return RunResult{Embed: embed, ThresholdBreach: breach}, nil
+	return RunResult{Embed: embed, ImagePNG: imagePNG, ThresholdBreach: breach}, nil
 }
 
 // PlainText flattens an embed into a single human-readable string —
@@ -351,6 +364,12 @@ func targetDates(w domain.Watch) (depart, ret string, err error) {
 			r = *p.ReturnDate
 		}
 		return p.DepartDate, r, nil
+	case w.Kind.IsLodging():
+		p, err := w.DecodeLodgingParams()
+		if err != nil {
+			return "", "", err
+		}
+		return p.CheckIn, p.CheckOut, nil
 	default:
 		return "", "", fmt.Errorf("pipeline: unknown asset kind %q", w.Kind)
 	}

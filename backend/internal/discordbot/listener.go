@@ -33,10 +33,16 @@ import (
 const snoozeDuration = 7 * 24 * time.Hour
 
 type Listener struct {
-	Session *discordgo.Session
-	Repo    domain.Repository
-	Sched   *scheduler.Scheduler
-	Watches *service.WatchService
+	Session  *discordgo.Session
+	Repo     domain.Repository
+	Sched    *scheduler.Scheduler
+	Watches  *service.WatchService
+	Trips    *service.TripService
+	Requests *service.RequestService
+	// GuildID is where slash commands register — guild-scoped (not
+	// global) so they appear instantly, matching this app's single-server
+	// scope.
+	GuildID string
 }
 
 // Run opens the Gateway connection and blocks until ctx is canceled,
@@ -74,13 +80,29 @@ func (l *Listener) Run(ctx context.Context) {
 		}
 	}()
 
+	// Registered here, not before Open() — Session.State.User.ID (the
+	// application ID ApplicationCommandBulkOverwrite needs) is only
+	// populated once the Gateway connection is live. A registration
+	// failure is logged, not fatal — buttons still work without it.
+	if l.Session.State != nil && l.Session.State.User != nil {
+		if err := RegisterCommands(l.Session, l.Session.State.User.ID, l.GuildID); err != nil {
+			logging.From(ctx).Warn().Err(err).Msg("discordbot: register slash commands failed")
+		}
+	}
+
 	<-ctx.Done()
 }
 
 func (l *Listener) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.Type != discordgo.InteractionMessageComponent {
-		return
+	switch i.Type {
+	case discordgo.InteractionMessageComponent:
+		l.handleComponentInteraction(s, i)
+	case discordgo.InteractionApplicationCommand:
+		l.handleSlashCommand(s, i)
 	}
+}
+
+func (l *Listener) handleComponentInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data, ok := i.Data.(discordgo.MessageComponentInteractionData)
 	if !ok {
 		return
@@ -94,15 +116,7 @@ func (l *Listener) handleInteraction(s *discordgo.Session, i *discordgo.Interact
 	// no request-scoped context to inherit — same reasoning as the
 	// Telegram listener this replaced.
 	ctx := context.Background()
-
-	// Resolved once per interaction, not per helper — there's no
-	// Accept-Language header on a Discord interaction, so
-	// Settings.Language is the only source of locale here, same as the
-	// digest itself.
-	loc := i18n.EN
-	if settings, err := l.Repo.GetSettings(ctx); err == nil && i18n.Valid(settings.Language) {
-		loc = i18n.Locale(settings.Language)
-	}
+	loc := l.locale(ctx)
 
 	var confirmText string
 	switch action {
@@ -116,18 +130,34 @@ func (l *Listener) handleInteraction(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	// Ephemeral: visible only to whoever clicked the button, closest
-	// equivalent to Telegram's answerCallbackQuery toast — it doesn't
-	// clutter the channel with a confirmation nobody else needs to see.
+	l.respondEphemeral(s, i, confirmText)
+}
+
+// locale resolves the locale for a Discord interaction — there's no
+// Accept-Language header on one, so Settings.Language is the only
+// source, same as the digest itself.
+func (l *Listener) locale(ctx context.Context) i18n.Locale {
+	loc := i18n.EN
+	if settings, err := l.Repo.GetSettings(ctx); err == nil && i18n.Valid(settings.Language) {
+		loc = i18n.Locale(settings.Language)
+	}
+	return loc
+}
+
+// respondEphemeral replies to any interaction (button or slash command)
+// visible only to whoever triggered it — closest equivalent to
+// Telegram's answerCallbackQuery toast, so a confirmation doesn't
+// clutter the channel for everyone else.
+func (l *Listener) respondEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: confirmText,
+			Content: content,
 			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	}
 	if err := s.InteractionRespond(i.Interaction, resp); err != nil {
-		logging.From(ctx).Warn().Err(err).Msg("discordbot: interactionRespond failed")
+		logging.From(context.Background()).Warn().Err(err).Msg("discordbot: interactionRespond failed")
 	}
 }
 

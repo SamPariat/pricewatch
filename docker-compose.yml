@@ -42,6 +42,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: postgres://pricewatch:${POSTGRES_PASSWORD:-pricewatch}@postgres:5432/pricewatch?sslmode=disable
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       TRAVELPAYOUTS_TOKEN: ${TRAVELPAYOUTS_TOKEN}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}

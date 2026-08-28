@@ -29,6 +29,8 @@ type FakeRepository struct {
 	events     map[domain.RunID][]domain.RunEvent
 	watchState map[domain.WatchID]domain.WatchState
 	settings   domain.Settings
+	trips      map[domain.TripID]domain.Trip
+	requests   map[domain.RequestID]domain.Request
 }
 
 func New() *FakeRepository {
@@ -39,6 +41,8 @@ func New() *FakeRepository {
 		events:     make(map[domain.RunID][]domain.RunEvent),
 		watchState: make(map[domain.WatchID]domain.WatchState),
 		settings:   domain.Settings{Currency: "INR", Language: "en"},
+		trips:      make(map[domain.TripID]domain.Trip),
+		requests:   make(map[domain.RequestID]domain.Request),
 	}
 }
 
@@ -48,6 +52,15 @@ func (f *FakeRepository) SeedWatch(w domain.Watch) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.watches[w.ID] = w
+}
+
+// SeedTrip inserts a trip with a caller-chosen ID, bypassing CreateTrip's
+// ID generation — convenient for tests that want a known ID (e.g. to
+// seed a watch with a matching TripID).
+func (f *FakeRepository) SeedTrip(t domain.Trip) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.trips[t.ID] = t
 }
 
 func (f *FakeRepository) CreateWatch(ctx context.Context, w domain.Watch) (domain.Watch, error) {
@@ -234,4 +247,113 @@ func (f *FakeRepository) Runs() map[domain.RunID]domain.DigestRun {
 		out[k] = v
 	}
 	return out
+}
+
+// --- Trips ---
+
+func (f *FakeRepository) CreateTrip(ctx context.Context, t domain.Trip) (domain.Trip, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nextID++
+	t.ID = domain.TripID(strconv.Itoa(f.nextID))
+	t.CreatedAt = time.Now()
+	f.trips[t.ID] = t
+	return t, nil
+}
+
+func (f *FakeRepository) GetTrip(ctx context.Context, id domain.TripID) (domain.Trip, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.trips[id]
+	if !ok {
+		return domain.Trip{}, ErrNotFound
+	}
+	return t, nil
+}
+
+func (f *FakeRepository) ListTrips(ctx context.Context) ([]domain.Trip, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]domain.Trip, 0, len(f.trips))
+	for _, t := range f.trips {
+		out = append(out, t)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (f *FakeRepository) UpdateTrip(ctx context.Context, t domain.Trip) (domain.Trip, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.trips[t.ID]; !ok {
+		return domain.Trip{}, ErrNotFound
+	}
+	f.trips[t.ID] = t
+	return t, nil
+}
+
+// DeleteTrip mirrors the migration's ON DELETE CASCADE — every leg
+// belonging to this trip is deleted along with it.
+func (f *FakeRepository) DeleteTrip(ctx context.Context, id domain.TripID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.trips[id]; !ok {
+		return ErrNotFound
+	}
+	delete(f.trips, id)
+	for wid, w := range f.watches {
+		if w.TripID == id {
+			delete(f.watches, wid)
+		}
+	}
+	return nil
+}
+
+// --- Requests ---
+
+func (f *FakeRepository) CreateRequest(ctx context.Context, r domain.Request) (domain.Request, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nextID++
+	r.ID = domain.RequestID(strconv.Itoa(f.nextID))
+	r.CreatedAt = time.Now()
+	f.requests[r.ID] = r
+	return r, nil
+}
+
+func (f *FakeRepository) GetRequest(ctx context.Context, id domain.RequestID) (domain.Request, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.requests[id]
+	if !ok {
+		return domain.Request{}, ErrNotFound
+	}
+	return r, nil
+}
+
+func (f *FakeRepository) ListRequests(ctx context.Context, status domain.RequestStatus) ([]domain.Request, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]domain.Request, 0, len(f.requests))
+	for _, r := range f.requests {
+		if status == "" || r.Status == status {
+			out = append(out, r)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
+}
+
+func (f *FakeRepository) ResolveRequest(ctx context.Context, id domain.RequestID, status domain.RequestStatus) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.requests[id]
+	if !ok {
+		return ErrNotFound
+	}
+	now := time.Now()
+	r.Status = status
+	r.ResolvedAt = &now
+	f.requests[id] = r
+	return nil
 }

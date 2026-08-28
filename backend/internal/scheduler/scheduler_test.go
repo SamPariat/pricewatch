@@ -18,15 +18,24 @@ type fixedClock struct{ t time.Time }
 
 func (c fixedClock) Now() time.Time { return c.t }
 
-func flightWatch(t *testing.T, id, cronExpr string) domain.Watch {
+// seedTrip creates and seeds a Trip with the given ID/schedule, enabled.
+func seedTrip(repo *storetest.FakeRepository, id, cronExpr string) domain.Trip {
+	tr := domain.Trip{ID: domain.TripID(id), Name: id, CronExpr: cronExpr, Timezone: "UTC", Enabled: true}
+	repo.SeedTrip(tr)
+	return tr
+}
+
+// flightWatch builds a flight leg belonging to tripID. Callers seed the
+// trip separately via seedTrip so tests can control the schedule.
+func flightWatch(t *testing.T, id, tripID string) domain.Watch {
 	t.Helper()
 	params, err := json.Marshal(domain.FlightParams{Origin: "BLR", Destination: "GOI", DepartDate: "2026-12-10"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return domain.Watch{
-		ID: domain.WatchID(id), Kind: domain.AssetFlightOneWay, Enabled: true,
-		CronExpr: cronExpr, Timezone: "UTC", Params: params,
+		ID: domain.WatchID(id), TripID: domain.TripID(tripID), Kind: domain.AssetFlightOneWay, Enabled: true,
+		Params: params,
 	}
 }
 
@@ -60,9 +69,12 @@ func TestTTL_UnscheduledWatch_ReturnsMinTTL(t *testing.T) {
 
 func TestReload_WatchesSharingScheduleGetIdenticalNextRun(t *testing.T) {
 	repo := storetest.New()
-	repo.SeedWatch(flightWatch(t, "a", "*/5 * * * *"))
-	repo.SeedWatch(flightWatch(t, "b", "*/5 * * * *")) // same schedule as a
-	repo.SeedWatch(flightWatch(t, "c", "0 0 1 1 *"))   // once a year — very different Next
+	seedTrip(repo, "t-a", "*/5 * * * *")
+	seedTrip(repo, "t-b", "*/5 * * * *") // same schedule as t-a
+	seedTrip(repo, "t-c", "0 0 1 1 *")   // once a year — very different Next
+	repo.SeedWatch(flightWatch(t, "a", "t-a"))
+	repo.SeedWatch(flightWatch(t, "b", "t-b"))
+	repo.SeedWatch(flightWatch(t, "c", "t-c"))
 
 	p := &pipeline.Pipeline{Registry: providers.NewRegistry(), Repo: repo, Clock: fixedClock{time.Now()}}
 	s := New(repo, p, noop.New())
@@ -77,16 +89,17 @@ func TestReload_WatchesSharingScheduleGetIdenticalNextRun(t *testing.T) {
 		t.Fatalf("expected all three watches to be scheduled, got a=%v b=%v c=%v", nextA, nextB, nextC)
 	}
 	if !nextA.Equal(nextB) {
-		t.Errorf("watches a and b share a cron_expr and should share one entry (equal NextRun), got a=%v b=%v", nextA, nextB)
+		t.Errorf("trips t-a and t-b share a cron_expr and should share one entry (equal NextRun), got a=%v b=%v", nextA, nextB)
 	}
 	if nextA.Equal(nextC) {
-		t.Errorf("watches a and c have different schedules and should not share a NextRun")
+		t.Errorf("trips t-a and t-c have different schedules and should not share a NextRun")
 	}
 }
 
 func TestReload_Interval_MatchesScheduleGap(t *testing.T) {
 	repo := storetest.New()
-	repo.SeedWatch(flightWatch(t, "a", "*/5 * * * *")) // fires every 5 minutes
+	seedTrip(repo, "t-a", "*/5 * * * *") // fires every 5 minutes
+	repo.SeedWatch(flightWatch(t, "a", "t-a"))
 
 	p := &pipeline.Pipeline{Registry: providers.NewRegistry(), Repo: repo, Clock: fixedClock{time.Now()}}
 	s := New(repo, p, noop.New())
@@ -136,9 +149,10 @@ func (p *priceProvider) Fetch(ctx context.Context, w domain.Watch) ([]domain.Quo
 	return []domain.Quote{{WatchID: w.ID, PriceMinor: p.priceMinor, DepartDate: "2026-12-10", Fingerprint: "a"}}, nil
 }
 
-func TestFireGroup_SingleWatch_AttachesSnoozeButtons(t *testing.T) {
+func TestFireTrip_SingleLeg_AttachesSnoozeButtons(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "solo", "0 7 * * *")
+	tr := seedTrip(repo, "solo-trip", "0 7 * * *")
+	w := flightWatch(t, "solo", "solo-trip")
 	repo.SeedWatch(w)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 
@@ -148,20 +162,21 @@ func TestFireGroup_SingleWatch_AttachesSnoozeButtons(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w})
 
 	if len(notifier.sent) != 1 {
 		t.Fatalf("got %d sends, want 1", len(notifier.sent))
 	}
 	if len(notifier.sent[0].Buttons) == 0 {
-		t.Error("expected snooze/pause/refresh buttons on a single-watch digest")
+		t.Error("expected snooze/pause/refresh buttons on a single-leg digest")
 	}
 }
 
-func TestFireGroup_MultipleWatches_NoButtons(t *testing.T) {
+func TestFireTrip_MultipleLegs_NoButtons(t *testing.T) {
 	repo := storetest.New()
-	w1 := flightWatch(t, "multi1", "0 7 * * *")
-	w2 := flightWatch(t, "multi2", "0 7 * * *")
+	tr := seedTrip(repo, "multi-trip", "0 7 * * *")
+	w1 := flightWatch(t, "multi1", "multi-trip")
+	w2 := flightWatch(t, "multi2", "multi-trip")
 	repo.SeedWatch(w1)
 	repo.SeedWatch(w2)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
@@ -172,19 +187,23 @@ func TestFireGroup_MultipleWatches_NoButtons(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w1, w2})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w1, w2})
 
 	if len(notifier.sent) != 1 {
 		t.Fatalf("got %d sends, want 1", len(notifier.sent))
 	}
 	if len(notifier.sent[0].Buttons) != 0 {
-		t.Error("expected no buttons on a batched multi-watch digest — there's no single watch for them to act on")
+		t.Error("expected no buttons on a batched multi-leg digest — there's no single leg for them to act on")
+	}
+	if !strings.Contains(notifier.sent[0].Content, tr.Name) {
+		t.Errorf("expected the digest header to include the trip name %q, got: %q", tr.Name, notifier.sent[0].Content)
 	}
 }
 
-func TestFireGroup_SkipsSnoozedWatch(t *testing.T) {
+func TestFireTrip_SkipsSnoozedLeg(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "snoozed", "0 7 * * *")
+	tr := seedTrip(repo, "snoozed-trip", "0 7 * * *")
+	w := flightWatch(t, "snoozed", "snoozed-trip")
 	repo.SeedWatch(w)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	until := time.Now().Add(7 * 24 * time.Hour)
@@ -198,16 +217,17 @@ func TestFireGroup_SkipsSnoozedWatch(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w})
 
 	if len(notifier.sent) != 0 {
-		t.Errorf("expected no send for a snoozed watch, got %d", len(notifier.sent))
+		t.Errorf("expected no send for a snoozed leg, got %d", len(notifier.sent))
 	}
 }
 
-func TestFireGroup_ExpiredSnooze_StillRuns(t *testing.T) {
+func TestFireTrip_ExpiredSnooze_StillRuns(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "expired-snooze", "0 7 * * *")
+	tr := seedTrip(repo, "expired-trip", "0 7 * * *")
+	w := flightWatch(t, "expired-snooze", "expired-trip")
 	repo.SeedWatch(w)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	past := time.Now().Add(-time.Hour) // snooze already lapsed
@@ -221,18 +241,18 @@ func TestFireGroup_ExpiredSnooze_StillRuns(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w})
 
 	if len(notifier.sent) != 1 {
-		t.Errorf("expected the watch to run once its snooze has lapsed, got %d sends", len(notifier.sent))
+		t.Errorf("expected the leg to run once its snooze has lapsed, got %d sends", len(notifier.sent))
 	}
 }
 
-// TestFireGroup_ThresholdBreach_SendsExtraAlert seeds yesterday's price so
-// today's fetch registers as a real drop, then asserts the breached watch
+// TestFireTrip_ThresholdBreach_SendsExtraAlert seeds yesterday's price so
+// today's fetch registers as a real drop, then asserts the breached leg
 // gets its own alert message on top of (not instead of) the normal
 // digest send — see pipeline.RunResult.ThresholdBreach's doc comment.
-func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
+func TestFireTrip_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	repo := storetest.New()
 	// A fixed UTC time, not time.Now() — rollupForWatch always stamps a
 	// fresh sample's SampleDate in time.UTC, and dateOnly() (which the
@@ -241,7 +261,8 @@ func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	// "yesterday" sample invisible to DeltaVsYesterday on any machine
 	// not already running in UTC.
 	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
-	w := flightWatch(t, "cheap", "0 7 * * *")
+	tr := seedTrip(repo, "cheap-trip", "0 7 * * *")
+	w := flightWatch(t, "cheap", "cheap-trip")
 	w.ThresholdPct = 10
 	repo.SeedWatch(w)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
@@ -257,7 +278,7 @@ func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w})
 
 	if len(notifier.sent) != 2 {
 		t.Fatalf("got %d sends, want 2 (threshold alert + digest)", len(notifier.sent))
@@ -273,13 +294,14 @@ func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	}
 }
 
-// TestFireGroup_NoThreshold_SendsOnlyDigest is the control for the test
+// TestFireTrip_NoThreshold_SendsOnlyDigest is the control for the test
 // above: with no ThresholdPct configured, the same 50% drop must not
 // produce an extra alert send.
-func TestFireGroup_NoThreshold_SendsOnlyDigest(t *testing.T) {
+func TestFireTrip_NoThreshold_SendsOnlyDigest(t *testing.T) {
 	repo := storetest.New()
 	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
-	w := flightWatch(t, "no-threshold", "0 7 * * *") // ThresholdPct left at zero value
+	tr := seedTrip(repo, "no-threshold-trip", "0 7 * * *")
+	w := flightWatch(t, "no-threshold", "no-threshold-trip") // ThresholdPct left at zero value
 	repo.SeedWatch(w)
 	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
@@ -294,16 +316,17 @@ func TestFireGroup_NoThreshold_SendsOnlyDigest(t *testing.T) {
 	notifier := &recordingNotifier{}
 	s := New(repo, p, notifier)
 
-	s.fireGroup(context.Background(), []domain.Watch{w})
+	s.fireTrip(context.Background(), tr, []domain.Watch{w})
 
 	if len(notifier.sent) != 1 {
 		t.Fatalf("got %d sends, want 1 (digest only — no threshold configured)", len(notifier.sent))
 	}
 }
 
-func TestReload_DisabledWatchIsNotScheduled(t *testing.T) {
+func TestReload_DisabledLegIsNotScheduled(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "disabled", "*/5 * * * *")
+	seedTrip(repo, "t-disabled", "*/5 * * * *")
+	w := flightWatch(t, "disabled", "t-disabled")
 	w.Enabled = false
 	repo.SeedWatch(w)
 
@@ -316,6 +339,26 @@ func TestReload_DisabledWatchIsNotScheduled(t *testing.T) {
 	defer s.Stop()
 
 	if got := s.NextRun("disabled"); !got.IsZero() {
-		t.Errorf("expected a disabled watch to have no NextRun, got %v", got)
+		t.Errorf("expected a disabled leg to have no NextRun, got %v", got)
+	}
+}
+
+func TestReload_DisabledTripIsNotScheduled(t *testing.T) {
+	repo := storetest.New()
+	tr := seedTrip(repo, "t-off", "*/5 * * * *")
+	tr.Enabled = false
+	repo.SeedTrip(tr)
+	repo.SeedWatch(flightWatch(t, "leg-of-off-trip", "t-off"))
+
+	p := &pipeline.Pipeline{Registry: providers.NewRegistry(), Repo: repo, Clock: fixedClock{time.Now()}}
+	s := New(repo, p, noop.New())
+
+	if err := s.Reload(context.Background()); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	defer s.Stop()
+
+	if got := s.NextRun("leg-of-off-trip"); !got.IsZero() {
+		t.Errorf("expected a leg of a disabled trip to have no NextRun, got %v", got)
 	}
 }

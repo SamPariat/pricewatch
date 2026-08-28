@@ -18,16 +18,15 @@ type watchRequest struct {
 	Name         string          `json:"name"`
 	Kind         string          `json:"kind"`
 	Enabled      *bool           `json:"enabled"`
-	CronExpr     string          `json:"cron_expr"`
-	Timezone     string          `json:"timezone"`
 	Params       json.RawMessage `json:"params"`
 	ThresholdPct float64         `json:"threshold_pct"`
+	TripID       string          `json:"trip_id"`
 }
 
 func (r watchRequest) toInput() service.WatchInput {
 	return service.WatchInput{
 		Name: r.Name, Kind: r.Kind, Enabled: r.Enabled,
-		CronExpr: r.CronExpr, Timezone: r.Timezone, Params: r.Params, ThresholdPct: r.ThresholdPct,
+		Params: r.Params, ThresholdPct: r.ThresholdPct, TripID: r.TripID,
 	}
 }
 

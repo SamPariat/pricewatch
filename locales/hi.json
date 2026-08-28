@@ -20,6 +20,22 @@
       "history_failed": "मूल्य इतिहास प्राप्त करने में विफल",
       "history": "इतिहास"
     },
+    "trips": {
+      "list_failed": "ट्रिप सूची प्राप्त करने में विफल",
+      "listed": "ट्रिप सूची प्राप्त हुई",
+      "not_found": "ट्रिप नहीं मिली",
+      "found": "ट्रिप मिली",
+      "create_failed": "ट्रिप बनाने में विफल",
+      "created": "ट्रिप बनाई गई",
+      "update_failed": "ट्रिप अपडेट करने में विफल",
+      "updated": "ट्रिप अपडेट हुई"
+    },
+    "requests": {
+      "list_failed": "अनुरोध सूची प्राप्त करने में विफल",
+      "listed": "अनुरोध सूची प्राप्त हुई",
+      "not_found": "अनुरोध नहीं मिला",
+      "approve_failed": "अनुरोध स्वीकृत करने में विफल"
+    },
     "settings": {
       "get_failed": "सेटिंग्स प्राप्त करने में विफल",
       "get_ok": "सेटिंग्स",
@@ -52,11 +68,19 @@
       "invalid_timezone": "अमान्य समय क्षेत्र: {Error}",
       "invalid_params": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: {Error}",
       "missing_flight_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: origin, destination और depart_date आवश्यक हैं",
-      "missing_return_date": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: return_date आवश्यक है"
+      "missing_return_date": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: return_date आवश्यक है",
+      "missing_lodging_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: url, check_in और check_out आवश्यक हैं",
+      "invalid_lodging_url": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: url एक Airbnb लिस्टिंग होनी चाहिए (airbnb.com/rooms/...)",
+      "missing_trip": "trip_id आवश्यक है — हर वॉच किसी ट्रिप से जुड़ा होना चाहिए",
+      "trip_not_found": "ट्रिप \"{TripID}\" नहीं मिली",
+      "invalid_trip_cron": "अमान्य cron_expr: {Error}",
+      "invalid_trip_timezone": "अमान्य समय क्षेत्र: {Error}"
     },
     "digest": {
       "header_singular": "दैनिक डाइजेस्ट — {Count} वॉच",
       "header_plural": "दैनिक डाइजेस्ट — {Count} वॉच",
+      "header_trip": "{Name} — {Count} अपडेट",
+      "lodging_generic": "Airbnb स्टे",
       "up": "ऊपर",
       "down": "नीचे",
       "delta": "{Arrow} {Pct}% (कल की तुलना में {Word})",
@@ -79,11 +103,19 @@
       "pause_failed": "रोकने में विफल — कृपया पैनल से पुनः प्रयास करें।",
       "paused": "रोक दिया गया। तैयार होने पर पैनल से इसे फिर से चालू करें।",
       "refresh_failed": "रीफ़्रेश विफल — पैनल में रन लॉग जांचें।",
-      "refreshed": "रीफ़्रेश हो गया।"
+      "refreshed": "रीफ़्रेश हो गया।",
+      "trip_submitted": "सबमिट किया गया — पैनल में Requests पेज से स्वीकृत करें।",
+      "track_submitted": "सबमिट किया गया — पैनल में Requests पेज से स्वीकृत करें।",
+      "track_remove_submitted": "सबमिट किया गया — पैनल में Requests पेज से स्वीकृत करें।",
+      "track_list_empty": "अभी तक कोई Airbnb लिंक ट्रैक नहीं किया गया।",
+      "trip_list_empty": "अभी तक कोई ट्रिप नहीं — /trip create से एक बनाएं।",
+      "trip_not_found": "इस नाम की कोई ट्रिप नहीं मिली — /trip list जांचें, या पहले /trip create से बनाएं।",
+      "request_failed": "कुछ गलत हो गया — पुनः प्रयास करें, या पैनल जांचें।"
     }
   },
   "nav": {
-    "watches": "वॉच",
+    "trips": "ट्रिप",
+    "requests": "अनुरोध",
     "runs": "रन",
     "settings": "सेटिंग्स",
     "signOut": "साइन आउट"
@@ -130,6 +162,17 @@
     "statusOk": "ठीक",
     "updatedPrefix": "अपडेट किया गया"
   },
+  "trips": {
+    "title": "ट्रिप",
+    "count": "ट्रिप",
+    "newTrip": "नई ट्रिप",
+    "emptyText": "अभी तक कोई ट्रिप नहीं — फ्लाइट या स्टे ट्रैक करने के लिए एक बनाएं।",
+    "legCount": "लेग",
+    "paused": "रुका हुआ",
+    "addLeg": "लेग जोड़ें",
+    "noLegsYet": "अभी तक कोई लेग नहीं — फ्लाइट या Airbnb लिंक जोड़ें।",
+    "scheduleLabel": "प्रतिदिन {Time} बजे ({Tz})"
+  },
   "watchDetail": {
     "edit": "संपादित करें",
     "updatedPrefix": "अपडेट किया गया",
@@ -147,13 +190,15 @@
     "typeLabel": "प्रकार",
     "kindOneWay": "वन-वे",
     "kindReturn": "राउंड ट्रिप",
+    "kindAirbnb": "Airbnb",
     "originLabel": "प्रस्थान (IATA)",
     "destinationLabel": "गंतव्य (IATA)",
     "departDateLabel": "प्रस्थान तिथि",
     "returnDateLabel": "वापसी तिथि",
-    "hourLabel": "जांच का समय (घंटा)",
-    "minuteLabel": "जांच का समय (मिनट)",
-    "timezoneLabel": "समय क्षेत्र",
+    "urlLabel": "Airbnb लिस्टिंग URL",
+    "checkInLabel": "चेक-इन",
+    "checkOutLabel": "चेक-आउट",
+    "guestsLabel": "मेहमान (वैकल्पिक)",
     "thresholdLabel": "अलर्ट सीमा (% गिरावट)",
     "nameLabel": "नाम (वैकल्पिक)",
     "namePlaceholder": "दिसंबर में गोवा की वापसी यात्रा",
@@ -162,11 +207,47 @@
     "saveWatch": "वॉच सहेजें"
   },
   "newWatch": {
-    "title": "नया वॉच",
-    "subtitle": "फ्लाइट की कीमत समय के साथ ट्रैक करें।"
+    "title": "नया लेग",
+    "subtitle": "\"{Name}\" में फ्लाइट या Airbnb स्टे जोड़ें।"
   },
   "editWatch": {
-    "title": "वॉच संपादित करें"
+    "title": "लेग संपादित करें"
+  },
+  "tripForm": {
+    "nameLabel": "ट्रिप का नाम",
+    "namePlaceholder": "गोवा, दिसंबर",
+    "hourLabel": "जांच का समय (घंटा)",
+    "minuteLabel": "जांच का समय (मिनट)",
+    "timezoneLabel": "समय क्षेत्र",
+    "saving": "सहेजा जा रहा है…",
+    "saveChanges": "बदलाव सहेजें",
+    "saveTrip": "ट्रिप सहेजें"
+  },
+  "newTrip": {
+    "title": "नई ट्रिप",
+    "subtitle": "नाम दें और जांच का समय चुनें — इसके बाद आप फ्लाइट या स्टे जोड़ सकते हैं।"
+  },
+  "editTrip": {
+    "title": "ट्रिप संपादित करें"
+  },
+  "deleteTripDialog": {
+    "trigger": "ट्रिप हटाएं",
+    "title": "ट्रिप हटाएं?",
+    "description": "यह \"{Name}\" और उसके हर लेग (फ्लाइट या स्टे) को उनके मूल्य इतिहास सहित स्थायी रूप से हटा देगा। इसे वापस नहीं किया जा सकता।",
+    "fallbackName": "यह ट्रिप",
+    "cancel": "रद्द करें",
+    "confirm": "हटाएं",
+    "deleting": "हटाया जा रहा है…"
+  },
+  "requests": {
+    "title": "अनुरोध",
+    "subtitle": "Discord से सबमिट किए गए बदलाव, आपकी स्वीकृति की प्रतीक्षा में।",
+    "empty": "कोई लंबित अनुरोध नहीं।",
+    "approve": "स्वीकृत करें",
+    "reject": "अस्वीकृत करें",
+    "kind_add_leg": "लिंक जोड़ें",
+    "kind_remove_leg": "लिंक हटाएं",
+    "kind_create_trip": "नई ट्रिप"
   },
   "deleteDialog": {
     "trigger": "हटाएं",
@@ -222,6 +303,8 @@
   "errors": {
     "createWatchFailed": "वॉच बनाने में विफल",
     "updateWatchFailed": "वॉच अपडेट करने में विफल",
+    "createTripFailed": "ट्रिप बनाने में विफल",
+    "updateTripFailed": "ट्रिप अपडेट करने में विफल",
     "loginServerUnreachable": "सर्वर से संपर्क नहीं हो सका — पुनः प्रयास करें।",
     "loginIncorrectPassword": "गलत पासवर्ड।",
     "loginSomethingWrong": "कुछ गलत हो गया — पुनः प्रयास करें।",

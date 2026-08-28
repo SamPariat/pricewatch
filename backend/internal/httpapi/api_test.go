@@ -10,9 +10,10 @@ import (
 func TestCreateWatch_OneWay_NoReturnDateRequired(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
 	body := map[string]any{
-		"name": "one way", "kind": "flight_one_way", "cron_expr": "0 7 * * *", "timezone": "UTC",
+		"name": "one way", "kind": "flight_one_way", "trip_id": tripID,
 		"params": map[string]any{"origin": "BLR", "destination": "GOI", "depart_date": "2026-12-10"},
 	}
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
@@ -24,9 +25,10 @@ func TestCreateWatch_OneWay_NoReturnDateRequired(t *testing.T) {
 func TestCreateWatch_Return_MissingReturnDate_Returns400(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
 	body := map[string]any{
-		"name": "missing return", "kind": "flight_return", "cron_expr": "0 7 * * *", "timezone": "UTC",
+		"name": "missing return", "kind": "flight_return", "trip_id": tripID,
 		"params": map[string]any{"origin": "BLR", "destination": "GOI", "depart_date": "2026-12-10"},
 	}
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
@@ -76,8 +78,9 @@ func TestRuns_EmptyInitially(t *testing.T) {
 func TestRuns_AfterRunNow_ShowsFailedRun(t *testing.T) {
 	env := newTestEnv(t) // empty provider registry — the run will fail at fetch
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("run test", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("run test", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
 	env.do(t, http.MethodPost, apiPrefix+"/watches/"+created.ID+"/run", nil, cookie)
@@ -135,9 +138,11 @@ func TestChannelStatus_ReturnsNotifierStatus(t *testing.T) {
 func TestAnalyticsSummary_CountsWatches(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripA := seedTrip(t, env, "0 7 * * *")
+	tripB := seedTrip(t, env, "0 8 * * *")
 
-	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("a", "0 7 * * *"), cookie)
-	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("b", "0 8 * * *"), cookie)
+	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("a", tripA), cookie)
+	env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("b", tripB), cookie)
 
 	resp := env.do(t, http.MethodGet, apiPrefix+"/analytics/summary", nil, cookie)
 	summary := decodeData[v1.AnalyticsSummary](t, resp)

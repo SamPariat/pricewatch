@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/robfig/cron/v3"
 
 	"github.com/SamPariat/pricewatch/internal/analytics"
 	"github.com/SamPariat/pricewatch/internal/domain"
@@ -41,15 +42,16 @@ type WatchService struct {
 
 // WatchInput is the create/update payload, decoded from the controller's
 // own wire-format request type — kept separate so the service never
-// depends on how a request happened to arrive over HTTP.
+// depends on how a request happened to arrive over HTTP. A watch has no
+// schedule of its own (see domain.Watch) — TripID is required; the
+// schedule lives on that trip.
 type WatchInput struct {
 	Name         string
 	Kind         string
 	Enabled      *bool
 	Params       []byte
-	CronExpr     string
-	Timezone     string
 	ThresholdPct float64
+	TripID       string
 }
 
 // Detail is one watch enriched with everything the panel/API need beyond
@@ -98,12 +100,12 @@ func (s *WatchService) Get(ctx context.Context, id domain.WatchID) (Detail, erro
 func (s *WatchService) Create(ctx context.Context, in WatchInput) (Detail, error) {
 	w := domain.Watch{
 		Name: in.Name, Kind: domain.AssetKind(in.Kind), Enabled: true,
-		CronExpr: in.CronExpr, Timezone: in.Timezone, Params: in.Params, ThresholdPct: in.ThresholdPct,
+		Params: in.Params, ThresholdPct: in.ThresholdPct, TripID: domain.TripID(in.TripID),
 	}
 	if in.Enabled != nil {
 		w.Enabled = *in.Enabled
 	}
-	if err := validateWatch(ctx, w); err != nil {
+	if err := s.validateWatch(ctx, w); err != nil {
 		return Detail{}, ValidationError{err}
 	}
 
@@ -141,14 +143,13 @@ func (s *WatchService) Update(ctx context.Context, id domain.WatchID, in WatchIn
 	updated := existing
 	updated.Name = in.Name
 	updated.Kind = domain.AssetKind(in.Kind)
-	updated.CronExpr = in.CronExpr
-	updated.Timezone = in.Timezone
 	updated.Params = in.Params
 	updated.ThresholdPct = in.ThresholdPct
+	updated.TripID = domain.TripID(in.TripID)
 	if in.Enabled != nil {
 		updated.Enabled = *in.Enabled
 	}
-	if err := validateWatch(ctx, updated); err != nil {
+	if err := s.validateWatch(ctx, updated); err != nil {
 		return Detail{}, ValidationError{err}
 	}
 
@@ -209,7 +210,12 @@ func (s *WatchService) RunNow(ctx context.Context, id domain.WatchID, send bool)
 	}
 
 	if send && serr == nil && !settings.DryRun && settings.DiscordChannelID != "" {
-		msg := render.CombineDigest([]domain.Embed{res.Embed}, loc)
+		tripName := ""
+		if trip, terr := s.Repo.GetTrip(ctx, w.TripID); terr == nil {
+			tripName = trip.Name
+		}
+		msg := render.CombineDigest([]domain.Embed{res.Embed}, tripName, loc)
+		msg.ImagePNG = res.ImagePNG
 		if err := s.Notifier.Send(ctx, domain.Target{ChannelID: settings.DiscordChannelID}, msg); err != nil {
 			logging.From(rctx).Error().Err(err).Msg("run-now: send failed")
 		}
@@ -291,34 +297,65 @@ func (s *WatchService) priceSummary(ctx context.Context, id domain.WatchID, curr
 	return &lastUpdated, summary
 }
 
-// validateWatch's messages are localized via i18n.From(ctx) — for the
-// wrapped %w errors from cron.ParseStandard and time.LoadLocation, only
-// the app-authored prefix is translated; the wrapped library error text
-// itself stays in English, the same way a stack trace frame or a raw
-// field name would in any localized system (see internal/i18n's own doc
-// comment).
-func validateWatch(ctx context.Context, w domain.Watch) error {
+// validateWatch's messages are localized via i18n.From(ctx). It's a
+// method (not a free function) because it needs Repo to confirm TripID
+// actually names an existing trip — a watch that decoded fine but
+// pointed at a deleted/typo'd trip would otherwise fail confusingly
+// later, in the scheduler, instead of at create/update time.
+func (s *WatchService) validateWatch(ctx context.Context, w domain.Watch) error {
 	loc := i18n.From(ctx)
 	if !w.Kind.Valid() {
 		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_kind", "Kind", w.Kind))
 	}
-	if _, err := cron.ParseStandard(w.CronExpr); err != nil {
-		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_cron", "Error", err.Error()))
+	if w.TripID == "" {
+		return fmt.Errorf("%s", i18n.T(loc, "validation.missing_trip"))
 	}
-	if w.Timezone != "" {
-		if _, err := time.LoadLocation(w.Timezone); err != nil {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_timezone", "Error", err.Error()))
+	if _, err := s.Repo.GetTrip(ctx, w.TripID); err != nil {
+		return fmt.Errorf("%s", i18n.T(loc, "validation.trip_not_found", "TripID", w.TripID))
+	}
+	switch {
+	case w.Kind.IsFlight():
+		p, err := w.DecodeFlightParams()
+		if err != nil {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
+		}
+		if p.Origin == "" || p.Destination == "" || p.DepartDate == "" {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_flight_fields", "Kind", w.Kind))
+		}
+		if w.Kind == domain.AssetFlightReturn && (p.ReturnDate == nil || *p.ReturnDate == "") {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_return_date", "Kind", w.Kind))
+		}
+	case w.Kind.IsLodging():
+		p, err := w.DecodeLodgingParams()
+		if err != nil {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
+		}
+		// json.Unmarshal silently ignores fields it doesn't recognize —
+		// flight-shaped params decode into a LodgingParams{} with every
+		// field empty without erroring, so decoding alone doesn't prove
+		// the params actually matched the kind. Checking the required
+		// fields landed does.
+		if p.URL == "" || p.CheckIn == "" || p.CheckOut == "" {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_lodging_fields", "Kind", w.Kind))
+		}
+		if !isAirbnbListingURL(p.URL) {
+			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_lodging_url", "Kind", w.Kind))
 		}
 	}
-	p, err := w.DecodeFlightParams()
-	if err != nil {
-		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
-	}
-	if p.Origin == "" || p.Destination == "" || p.DepartDate == "" {
-		return fmt.Errorf("%s", i18n.T(loc, "validation.missing_flight_fields", "Kind", w.Kind))
-	}
-	if w.Kind == domain.AssetFlightReturn && (p.ReturnDate == nil || *p.ReturnDate == "") {
-		return fmt.Errorf("%s", i18n.T(loc, "validation.missing_return_date", "Kind", w.Kind))
-	}
 	return nil
+}
+
+// isAirbnbListingURL is a permissive sanity check, not a strict
+// validator — it just catches "that's obviously not an Airbnb listing"
+// (wrong site, a search-results URL) before it reaches the scraper.
+func isAirbnbListingURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+	if !strings.HasPrefix(host, "airbnb.") {
+		return false
+	}
+	return strings.HasPrefix(u.Path, "/rooms/")
 }

@@ -9,12 +9,21 @@ import (
 	v1 "github.com/SamPariat/pricewatch/internal/httpapi/presenter/v1"
 )
 
-func flightWatchBody(name, cronExpr string) map[string]any {
+// seedTrip seeds a trip directly via the fake repo (bypassing the HTTP
+// layer — trip CRUD isn't under test here) and returns its ID, so a
+// watch-creation body has somewhere valid to point trip_id at.
+func seedTrip(t *testing.T, env *testEnv, cronExpr string) string {
+	t.Helper()
+	id := domain.TripID("trip-" + cronExpr)
+	env.repo.SeedTrip(domain.Trip{ID: id, Name: "Test trip", CronExpr: cronExpr, Timezone: "UTC", Enabled: true})
+	return string(id)
+}
+
+func flightWatchBody(name, tripID string) map[string]any {
 	return map[string]any{
 		"name":          name,
 		"kind":          "flight_return",
-		"cron_expr":     cronExpr,
-		"timezone":      "UTC",
+		"trip_id":       tripID,
 		"threshold_pct": 15,
 		"params": map[string]any{
 			"origin": "BLR", "destination": "GOI",
@@ -73,8 +82,9 @@ func TestWatches_InvalidCookie_Rejected(t *testing.T) {
 func TestCreateWatch_ThenListAndGet(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Goa trip", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Goa trip", tripID), cookie)
 	if createResp.StatusCode != http.StatusCreated {
 		t.Fatalf("create status = %d", createResp.StatusCode)
 	}
@@ -110,8 +120,9 @@ func TestCreateWatch_ThenListAndGet(t *testing.T) {
 func TestCreateWatch_InvalidKind_Returns400(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	body := flightWatchBody("bad", "0 7 * * *")
+	body := flightWatchBody("bad", tripID)
 	body["kind"] = "not_a_real_kind"
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
@@ -123,11 +134,11 @@ func TestCreateWatch_InvalidKind_Returns400(t *testing.T) {
 	}
 }
 
-func TestCreateWatch_InvalidCron_Returns400(t *testing.T) {
+func TestCreateWatch_UnknownTrip_Returns400(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
 
-	body := flightWatchBody("bad cron", "not a cron expression")
+	body := flightWatchBody("no such trip", "does-not-exist")
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
@@ -137,9 +148,10 @@ func TestCreateWatch_InvalidCron_Returns400(t *testing.T) {
 func TestCreateWatch_ParamsMismatchedToKind_Returns400(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
 	body := map[string]any{
-		"name": "bad params", "kind": "flight_return", "cron_expr": "0 7 * * *", "timezone": "UTC",
+		"name": "bad params", "kind": "flight_return", "trip_id": tripID,
 		"params": map[string]any{"location": "Goa"}, // params missing the required flight fields
 	}
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
@@ -151,17 +163,18 @@ func TestCreateWatch_ParamsMismatchedToKind_Returns400(t *testing.T) {
 func TestUpdateWatch_ChangesFields(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Original", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("Original", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
-	body := flightWatchBody("Renamed", "0 8 * * *")
+	body := flightWatchBody("Renamed", tripID)
 	updateResp := env.do(t, http.MethodPatch, apiPrefix+"/watches/"+created.ID, body, cookie)
 	if updateResp.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d", updateResp.StatusCode)
 	}
 	updated := decodeData[v1.Watch](t, updateResp)
-	if updated.Name != "Renamed" || updated.CronExpr != "0 8 * * *" {
+	if updated.Name != "Renamed" {
 		t.Errorf("update did not apply: %+v", updated)
 	}
 }
@@ -169,8 +182,9 @@ func TestUpdateWatch_ChangesFields(t *testing.T) {
 func TestUpdateWatch_NotFound_Returns404(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	resp := env.do(t, http.MethodPatch, apiPrefix+"/watches/does-not-exist", flightWatchBody("x", "0 7 * * *"), cookie)
+	resp := env.do(t, http.MethodPatch, apiPrefix+"/watches/does-not-exist", flightWatchBody("x", tripID), cookie)
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
@@ -179,8 +193,9 @@ func TestUpdateWatch_NotFound_Returns404(t *testing.T) {
 func TestDeleteWatch_ThenGet404(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("to delete", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("to delete", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
 	delResp := env.do(t, http.MethodDelete, apiPrefix+"/watches/"+created.ID, nil, cookie)
@@ -197,8 +212,9 @@ func TestDeleteWatch_ThenGet404(t *testing.T) {
 func TestRunWatchNow_NoProviderRegistered_Returns502(t *testing.T) {
 	env := newTestEnv(t) // deliberately built with an empty provider registry
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("no provider", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("no provider", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
 	runResp := env.do(t, http.MethodPost, apiPrefix+"/watches/"+created.ID+"/run", nil, cookie)
@@ -210,8 +226,9 @@ func TestRunWatchNow_NoProviderRegistered_Returns502(t *testing.T) {
 func TestGetWatch_IncludesPriceSummary_WhenSamplesExist(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("with price", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("with price", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
 	now := time.Now().UTC()
@@ -253,8 +270,9 @@ func dayOnly(t time.Time) time.Time {
 func TestGetHistory_EmptyForNewWatch(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
+	tripID := seedTrip(t, env, "0 7 * * *")
 
-	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("history test", "0 7 * * *"), cookie)
+	createResp := env.do(t, http.MethodPost, apiPrefix+"/watches", flightWatchBody("history test", tripID), cookie)
 	created := decodeData[v1.Watch](t, createResp)
 
 	histResp := env.do(t, http.MethodGet, apiPrefix+"/watches/"+created.ID+"/history?range=30d", nil, cookie)

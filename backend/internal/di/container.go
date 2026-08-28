@@ -27,6 +27,7 @@ import (
 	"github.com/SamPariat/pricewatch/internal/notify/discord"
 	"github.com/SamPariat/pricewatch/internal/pipeline"
 	"github.com/SamPariat/pricewatch/internal/providers"
+	"github.com/SamPariat/pricewatch/internal/providers/airbnb"
 	"github.com/SamPariat/pricewatch/internal/providers/aviasales"
 	"github.com/SamPariat/pricewatch/internal/scheduler"
 	"github.com/SamPariat/pricewatch/internal/service"
@@ -40,11 +41,12 @@ const sessionTTL = 7 * 24 * time.Hour
 // httpapi.Router, starts Container.Listener, and calls Close on
 // shutdown.
 type Container struct {
-	Pool      *pgxpool.Pool
-	Repo      domain.Repository
-	Scheduler *scheduler.Scheduler
-	Listener  *discordbot.Listener
-	API       *handlers.API
+	Pool          *pgxpool.Pool
+	Repo          domain.Repository
+	Scheduler     *scheduler.Scheduler
+	Listener      *discordbot.Listener
+	API           *handlers.API
+	AirbnbBrowser *airbnb.Browser
 }
 
 func New(ctx context.Context, cfg config.Config) (*Container, error) {
@@ -87,6 +89,16 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 	registry.Register(decorate(aviasales.NewOneWay(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
 	registry.Register(decorate(aviasales.NewReturn(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
 
+	// Launched eagerly (not lazily on first scrape) so a missing/broken
+	// Chrome binary fails startup with a clear error instead of failing
+	// silently on the first scheduled lodging fetch.
+	airbnbBrowser, err := airbnb.NewBrowser()
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("di: launch airbnb browser: %w", err)
+	}
+	registry.Register(decorateScraper(airbnb.New(airbnbBrowser), ristrettoCache, ttlHolder.TTL))
+
 	pl := &pipeline.Pipeline{
 		Registry: registry, Repo: repo, Clock: realClock{},
 		Copywriter: buildCopywriter(cfg, ristrettoCache),
@@ -118,10 +130,16 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 	}
 
 	watches := &service.WatchService{Repo: repo, Sched: sched, Pipeline: pl, Notifier: notifier, Clock: realClock{}}
+	trips := &service.TripService{Repo: repo, Sched: sched}
+	requests := &service.RequestService{Repo: repo, Watches: watches, Trips: trips}
 
-	// Button-interaction listener (Snooze 7d / Pause / Refresh now —
-	// PLAN.md § Discord).
-	listener := &discordbot.Listener{Session: discordSession, Repo: repo, Sched: sched, Watches: watches}
+	// Button-interaction listener (Snooze 7d / Pause / Refresh now) and
+	// slash-command handler (/trip, /track — PLAN.md § Discord), sharing
+	// one Session and dispatching on interaction type.
+	listener := &discordbot.Listener{
+		Session: discordSession, Repo: repo, Sched: sched,
+		Watches: watches, Trips: trips, Requests: requests, GuildID: cfg.DiscordGuildID,
+	}
 
 	// One Session instance shared by AuthService (issues tokens on login)
 	// and router.go's RequireAuth middleware (validates them) — both must
@@ -130,6 +148,8 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 
 	api := &handlers.API{
 		Watches:   watches,
+		Trips:     trips,
+		Requests:  requests,
 		Settings:  &service.SettingsService{Repo: repo},
 		Runs:      &service.RunsService{Repo: repo},
 		Analytics: &service.AnalyticsService{Repo: repo, Sched: sched, Clock: realClock{}},
@@ -139,12 +159,13 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 		Sched:     sched,
 	}
 
-	return &Container{Pool: pool, Repo: repo, Scheduler: sched, Listener: listener, API: api}, nil
+	return &Container{Pool: pool, Repo: repo, Scheduler: sched, Listener: listener, API: api, AirbnbBrowser: airbnbBrowser}, nil
 }
 
 // Close releases everything with a lifetime — called once, on shutdown.
 func (c *Container) Close() {
 	c.Scheduler.Stop()
+	c.AirbnbBrowser.Close()
 	c.Pool.Close()
 }
 
@@ -201,6 +222,21 @@ func decorate(p domain.Provider, c domain.Cache, ttlFor func(domain.WatchID) tim
 	p = providers.WithSingleflight(p)
 	p = providers.WithCache(p, c, ttlFor)
 	p = providers.WithRateLimit(p, 250) // Travelpayouts allows 300/min on /v1/prices/calendar; stay under it
+	p = providers.WithBreaker(p)
+	p = providers.WithRetry(p, 3, 500*time.Millisecond)
+	p = providers.WithLogging(p)
+	return p
+}
+
+// decorateScraper is decorate's counterpart for the Airbnb scraper: same
+// stack, but a far lower rate-limit budget — a headless-browser fetch is
+// an expensive full-page render, not a cheap JSON call, and Airbnb will
+// rate-limit or block aggressive polling. ~3/min keeps a comfortable
+// margin under any reasonable per-IP threshold.
+func decorateScraper(p domain.Provider, c domain.Cache, ttlFor func(domain.WatchID) time.Duration) domain.Provider {
+	p = providers.WithSingleflight(p)
+	p = providers.WithCache(p, c, ttlFor)
+	p = providers.WithRateLimit(p, 3)
 	p = providers.WithBreaker(p)
 	p = providers.WithRetry(p, 3, 500*time.Millisecond)
 	p = providers.WithLogging(p)

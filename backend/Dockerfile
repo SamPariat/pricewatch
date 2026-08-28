@@ -11,9 +11,18 @@ RUN go mod download
 COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# Not distroless anymore — the Airbnb scraper (internal/providers/airbnb)
+# needs a real Chromium binary, which means a package manager to install
+# it. This is a genuine regression in image size (~300-400MB vs
+# distroless's <30MB) and attack surface; accepted as the cost of
+# scraping a site with no API. CHROME_PATH tells chromedp exactly where
+# to find it rather than relying on auto-discovery.
+FROM alpine:3.20
+RUN apk add --no-cache chromium ca-certificates tzdata
+ENV CHROME_PATH=/usr/bin/chromium-browser
 COPY --from=build /out/server /server
 COPY locales/ /locales/
-USER nonroot:nonroot
+RUN adduser -D -u 65532 nonroot
+USER nonroot
 EXPOSE 8080
 ENTRYPOINT ["/server"]

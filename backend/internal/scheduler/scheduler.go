@@ -1,8 +1,8 @@
-// Package scheduler owns the cron entries derived from the watches table
-// and fires the pipeline, batching watches that share an exact schedule
-// into one digest send. See PLAN.md § Caching for why this package also
-// owns TTL(): "data only changes when the cron fires" — it's the one
-// place that actually knows when that is.
+// Package scheduler owns the cron entries derived from the trips table —
+// each trip's schedule fires the pipeline for every one of its legs
+// (watches) and sends one combined digest. See PLAN.md § Caching for why
+// this package also owns TTL(): "data only changes when the cron fires"
+// — it's the one place that actually knows when that is.
 package scheduler
 
 import (
@@ -45,39 +45,57 @@ func New(repo domain.Repository, p *pipeline.Pipeline, notifier domain.Notifier)
 	}
 }
 
-// Reload rebuilds every cron entry from the currently enabled watches,
-// grouping watches that share an exact (timezone, cron_expr) so they fire
-// — and send — together as one digest message (PLAN.md § Discord: "one
-// digest message for all watches, not one per watch"). Call it after any
-// watch create/update/delete/enable/disable so cron reflects the database
-// without a process restart.
+// Reload rebuilds every cron entry from the currently enabled trips,
+// grouping trips that share an exact (timezone, cron_expr) into one cron
+// entry so the underlying cron.Cron instance doesn't need one entry per
+// trip — each trip in the group still fires, and sends, independently as
+// its own digest message (one trip = one message; see fireTrip). Call it
+// after any trip/watch create/update/delete/enable/disable so cron
+// reflects the database without a process restart.
 func (s *Scheduler) Reload(ctx context.Context) error {
+	trips, err := s.repo.ListTrips(ctx)
+	if err != nil {
+		return fmt.Errorf("scheduler: list trips: %w", err)
+	}
 	watches, err := s.repo.ListWatches(ctx)
 	if err != nil {
 		return fmt.Errorf("scheduler: list watches: %w", err)
 	}
 
-	groups := make(map[string][]domain.Watch)
+	// legsByTrip groups every enabled leg by its trip — fetched once here
+	// rather than once per trip, to avoid an N+1 query per Reload. A
+	// disabled leg is skipped even if its trip fires (per-leg pause);
+	// legs of a disabled trip are simply never looked up, since that
+	// trip is excluded from groups below.
+	legsByTrip := make(map[domain.TripID][]domain.Watch)
 	for _, w := range watches {
 		if !w.Enabled {
 			continue
 		}
+		legsByTrip[w.TripID] = append(legsByTrip[w.TripID], w)
+	}
+
+	groups := make(map[string][]domain.Trip)
+	for _, t := range trips {
+		if !t.Enabled {
+			continue
+		}
 		// robfig/cron's standard parser strips a leading CRON_TZ= prefix
 		// and applies it as that entry's own location — this is how one
-		// Cron instance supports per-watch timezones without needing a
+		// Cron instance supports per-trip timezones without needing a
 		// separate instance per timezone.
-		spec := w.CronExpr
-		if w.Timezone != "" {
-			spec = "CRON_TZ=" + w.Timezone + " " + w.CronExpr
+		spec := t.CronExpr
+		if t.Timezone != "" {
+			spec = "CRON_TZ=" + t.Timezone + " " + t.CronExpr
 		}
-		groups[spec] = append(groups[spec], w)
+		groups[spec] = append(groups[spec], t)
 	}
 
 	c := cron.New(cron.WithChain(cron.Recover(cronLogger{}), cron.SkipIfStillRunning(cronLogger{})))
 	nextRun := make(map[domain.WatchID]time.Time)
 	interval := make(map[domain.WatchID]time.Duration)
 
-	for spec, ws := range groups {
+	for spec, ts := range groups {
 		// cron.Entry.Next is only populated by the Cron instance's own
 		// internal goroutine once Start() has run — reading it here,
 		// before Start(), would always see the zero value. Parsing the
@@ -89,11 +107,15 @@ func (s *Scheduler) Reload(ctx context.Context) error {
 			return fmt.Errorf("scheduler: bad schedule %q: %w", spec, perr)
 		}
 		if _, err = c.AddFunc(spec, func() {
-			s.fireGroup(context.Background(), ws)
+			for _, t := range ts {
+				s.fireTrip(context.Background(), t, legsByTrip[t.ID])
+			}
 			s.mu.Lock()
 			next := schedule.Next(time.Now())
-			for _, w := range ws {
-				s.nextRun[w.ID] = next
+			for _, t := range ts {
+				for _, w := range legsByTrip[t.ID] {
+					s.nextRun[w.ID] = next
+				}
 			}
 			s.mu.Unlock()
 		}); err != nil {
@@ -107,9 +129,11 @@ func (s *Scheduler) Reload(ctx context.Context) error {
 		// stale once it's gone more than 2x this long without a
 		// successful fetch (PLAN.md § Freshness).
 		gap := schedule.Next(next1).Sub(next1)
-		for _, w := range ws {
-			nextRun[w.ID] = next1
-			interval[w.ID] = gap
+		for _, t := range ts {
+			for _, w := range legsByTrip[t.ID] {
+				nextRun[w.ID] = next1
+				interval[w.ID] = gap
+			}
 		}
 	}
 
@@ -174,7 +198,13 @@ func (s *Scheduler) TTL(watchID domain.WatchID) time.Duration {
 	return d
 }
 
-func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
+// fireTrip runs every enabled, non-snoozed leg of one trip and sends the
+// result as a single combined digest message — one trip fire, one Send
+// call, same "one digest message for all watches, not one per watch"
+// shape the old cross-watch cron-string grouping had (PLAN.md § Discord),
+// just now grouped explicitly by Trip instead of incidentally by a
+// matching cron string.
+func (s *Scheduler) fireTrip(ctx context.Context, t domain.Trip, legs []domain.Watch) {
 	settings, err := s.repo.GetSettings(ctx)
 	if err != nil {
 		logging.From(ctx).Error().Err(err).Msg("scheduler: get settings")
@@ -191,9 +221,10 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 	}
 
 	var embeds []domain.Embed
+	var images [][]byte
 	var ranWatches []domain.Watch
 	var breached []domain.Watch
-	for _, w := range ws {
+	for _, w := range legs {
 		if state, err := s.repo.GetWatchState(ctx, w.ID); err == nil && isSnoozed(state, time.Now()) {
 			logging.From(ctx).Info().Str("watch_id", string(w.ID)).Time("snoozed_until", *state.SnoozedUntil).Msg("scheduler: skipping snoozed watch")
 			continue
@@ -207,6 +238,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 			continue
 		}
 		embeds = append(embeds, res.Embed)
+		images = append(images, res.ImagePNG)
 		ranWatches = append(ranWatches, w)
 		if res.ThresholdBreach {
 			breached = append(breached, w)
@@ -245,12 +277,15 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		}
 	}
 
-	msg := render.CombineDigest(embeds, loc)
-	// Buttons only make sense when the message is unambiguously about one
-	// watch — a batch of several watches has no single "this one" for
-	// Snooze/Pause/Refresh to act on. See PLAN.md § Discord.
+	msg := render.CombineDigest(embeds, t.Name, loc)
+	// Buttons — and the chart image, which is per-watch and Discord only
+	// lets one message carry one attachment — only make sense when the
+	// message is unambiguously about one watch. A batch of several
+	// watches has no single "this one" for either to belong to. See
+	// PLAN.md § Discord.
 	if len(ranWatches) == 1 {
 		msg.Buttons = snoozeButtons(ranWatches[0].ID)
+		msg.ImagePNG = images[0]
 	}
 	if err := s.notifier.Send(ctx, domain.Target{ChannelID: settings.DiscordChannelID}, msg); err != nil {
 		logging.From(ctx).Error().Err(err).Msg("scheduler: send failed")

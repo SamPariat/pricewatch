@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { bodyPreview, type Logger } from "./logger";
 import type {
-  AnalyticsSummary, ChannelStatus, DigestRun, Envelope, History, Meta,
-  RunEvent, Settings, Watch, WatchInput,
+  AnalyticsSummary, ChannelStatus, DigestRun, Envelope, History, Meta, Request, RequestStatus,
+  RunEvent, Settings, Trip, TripInput, Watch, WatchInput,
 } from "./types";
 
 // Matches backend/internal/httpapi/handlers.APIVersion — no shared source
@@ -169,6 +169,31 @@ export class ApiClient {
   }
   getChannelStatus() {
     return this.request<{ status: ChannelStatus }>(`/api/${API_VERSION}/channel/status`);
+  }
+  getTrips() {
+    return this.request<Trip[]>(`/api/${API_VERSION}/trips`);
+  }
+  getTrip(id: string) {
+    return this.request<Trip>(`/api/${API_VERSION}/trips/${id}`);
+  }
+  createTrip(data: TripInput) {
+    return this.request<Trip>(`/api/${API_VERSION}/trips`, { method: "POST", body: JSON.stringify(data) });
+  }
+  updateTrip(id: string, data: TripInput) {
+    return this.request<Trip>(`/api/${API_VERSION}/trips/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  deleteTrip(id: string) {
+    return this.request<void>(`/api/${API_VERSION}/trips/${id}`, { method: "DELETE" });
+  }
+  getRequests(status?: RequestStatus) {
+    const q = status ? `?status=${status}` : "";
+    return this.request<Request[]>(`/api/${API_VERSION}/requests${q}`);
+  }
+  approveRequest(id: string) {
+    return this.request<void>(`/api/${API_VERSION}/requests/${id}/approve`, { method: "POST" });
+  }
+  rejectRequest(id: string) {
+    return this.request<void>(`/api/${API_VERSION}/requests/${id}/reject`, { method: "POST" });
   }
 
   // login/logout don't go through request<T>() above: login's success

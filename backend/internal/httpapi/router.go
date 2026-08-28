@@ -50,6 +50,17 @@ func Router(app *fiber.App, api *handlers.API) {
 	auth.Post("/watches/:id/run", api.RunWatchNow)
 	auth.Get("/watches/:id/history", historyCache(api), api.GetHistory)
 
+	auth.Get("/trips", api.ListTrips)
+	auth.Post("/trips", api.CreateTrip)
+	auth.Get("/trips/:id", api.GetTrip)
+	auth.Patch("/trips/:id", api.UpdateTrip)
+	auth.Delete("/trips/:id", api.DeleteTrip)
+
+	// The Discord approval queue — see service.RequestService.
+	auth.Get("/requests", api.ListRequests)
+	auth.Post("/requests/:id/approve", api.ApproveRequest)
+	auth.Post("/requests/:id/reject", api.RejectRequest)
+
 	auth.Get("/analytics/summary", api.AnalyticsSummary)
 
 	auth.Get("/runs", api.ListRuns)
