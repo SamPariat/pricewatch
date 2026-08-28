@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plane, BedDouble, Plus } from "lucide-react";
+import { Plane, Plus } from "lucide-react";
 import { api } from "@/lib/container";
 import { formatPrice, watchSubtitle, watchTitle } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,10 @@ import type { Watch } from "@/lib/types";
 type WatchesT = Awaited<ReturnType<typeof getTranslations<"watches">>>;
 type WatchFormT = Awaited<ReturnType<typeof getTranslations<"watchForm">>>;
 
-function KindIcon({ kind }: { kind: Watch["kind"] }) {
-  const Icon = kind === "hotel" || kind === "rental" ? BedDouble : Plane;
+function KindIcon() {
   return (
     <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-      <Icon className="size-4" />
+      <Plane className="size-4" />
     </div>
   );
 }
@@ -127,7 +126,7 @@ function WatchCard({ watch, locale, t, tForm }: { watch: Watch; locale: string; 
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <KindIcon kind={watch.kind} />
+          <KindIcon />
           <div className="flex flex-col gap-0.5">
             <span className="text-[14.5px] font-semibold">{watchTitle(watch, tForm)}</span>
             <span className="text-[12.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</span>
@@ -156,7 +155,7 @@ function WatchRow({ watch, locale, t, tForm }: { watch: Watch; locale: string; t
     <tr className={`border-b border-border last:border-0 ${watch.stale ? "bg-warning/10" : ""}`}>
       <td className="px-5 py-3.5">
         <Link href={`/watches/${watch.id}`} className="flex items-center gap-2.5">
-          <KindIcon kind={watch.kind} />
+          <KindIcon />
           <div className="flex flex-col">
             <span className="text-[13.5px] font-semibold">{watchTitle(watch, tForm)}</span>
             <span className="text-[11.5px] text-muted-foreground">{watchSubtitle(watch, tForm, locale)}</span>

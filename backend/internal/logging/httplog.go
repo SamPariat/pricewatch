@@ -22,7 +22,7 @@ const (
 // the detail a bare "unexpected status 404" throws away.
 //
 // service identifies the integration and call, e.g. "aviasales: calendar"
-// or "telegram: sendMessage" — always a caller-supplied literal, never
+// or "discord: sendMessage" — always a caller-supplied literal, never
 // derived from the request, so there's no risk of a token embedded in a
 // URL path or query string (see PLAN.md § Traps: "the Travelpayouts token
 // travels in a query parameter") leaking through this path. Only the

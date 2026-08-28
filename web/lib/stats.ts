@@ -3,7 +3,7 @@ import type { PriceSample } from "./types";
 // Simple min/median/all-time-low arithmetic for the detail page's stat
 // tiles — deliberately reimplemented here rather than round-tripped from
 // the backend, unlike delta/percentile (lib/api.ts's PriceSummary),
-// which stay server-side because they're what the Telegram digest also
+// which stay server-side because they're what the Discord digest also
 // computes and must agree with. Min/median over an already-fetched
 // sample array carries none of that consistency risk.
 function windowed(samples: PriceSample[], days: number): PriceSample[] {

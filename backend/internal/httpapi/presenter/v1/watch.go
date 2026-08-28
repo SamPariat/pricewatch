@@ -32,7 +32,7 @@ type Watch struct {
 // PriceSummary is the current-price figure the watch list and detail
 // header lead with — computed once server-side from internal/analytics
 // (the same functions the digest uses), not reimplemented client-side,
-// so the panel and the Telegram message can never disagree about a
+// so the panel and the Discord message can never disagree about a
 // delta or a percentile.
 type PriceSummary struct {
 	PriceMinor int64    `json:"price_minor"`

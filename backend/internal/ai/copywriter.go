@@ -30,14 +30,17 @@ type Copywriter struct {
 	LLM domain.LLM
 }
 
-// Enhance appends an LLM-written reaction line to template (the output of
-// render.Digest) when c.LLM is configured and produces a usable line.
-// Every failure mode — nil LLM, timeout, upstream error, or a response
-// that fails the numberless check — returns template completely unchanged,
-// so a caller never needs its own fallback branch.
-func (c *Copywriter) Enhance(ctx context.Context, w domain.Watch, a render.Analysis, template string) string {
+// Enhance appends an LLM-written reaction line to embed.Description (the
+// output of render.Digest) when c.LLM is configured and produces a usable
+// line. Every failure mode — nil LLM, timeout, upstream error, or a
+// response that fails the numberless check — returns embed completely
+// unchanged, so a caller never needs its own fallback branch. Title and
+// Fields are never touched: those are pure Go-computed numbers, and the
+// guardrail against the LLM producing one applies just as much to a
+// structured field as to text.
+func (c *Copywriter) Enhance(ctx context.Context, w domain.Watch, a render.Analysis, embed domain.Embed) domain.Embed {
 	if c == nil || c.LLM == nil {
-		return template
+		return embed
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, completeTimeout)
@@ -46,16 +49,17 @@ func (c *Copywriter) Enhance(ctx context.Context, w domain.Watch, a render.Analy
 	raw, err := c.LLM.Complete(cctx, buildPrompt(w, a))
 	if err != nil {
 		logging.From(ctx).Warn().Err(err).Msg("ai: digest copywriting failed, using template")
-		return template
+		return embed
 	}
 
 	line, ok := sanitize(raw)
 	if !ok {
 		logging.From(ctx).Warn().Msg("ai: rejected LLM output for digest (contained a number or was empty)")
-		return template
+		return embed
 	}
 
-	return template + "\n<i>" + line + "</i>"
+	embed.Description = embed.Description + "\n*" + line + "*"
+	return embed
 }
 
 func buildPrompt(w domain.Watch, a render.Analysis) domain.Prompt {

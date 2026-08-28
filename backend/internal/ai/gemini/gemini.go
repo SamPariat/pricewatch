@@ -1,8 +1,10 @@
 // Package gemini adapts Google AI Studio's Gemini API to domain.LLM. Plain
 // REST over net/http rather than the official SDK — the request shape is
-// small and stable, and every other external adapter in this codebase
-// (aviasales, hotellook, telegram) is written the same way rather than
-// pulling in a client library for one endpoint.
+// small and stable, and every other external adapter that talks to a
+// plain REST API (aviasales, ollama) is written the same way rather than
+// pulling in a client library for one endpoint. Discord is the one
+// deliberate exception: its Gateway WebSocket protocol is enough of its
+// own thing that discordgo earns its keep (see internal/notify/discord).
 package gemini
 
 import (

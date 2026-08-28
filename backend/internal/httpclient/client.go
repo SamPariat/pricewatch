@@ -1,8 +1,9 @@
 // Package httpclient is the one place every outbound call to a
-// third-party API goes through — Aviasales, Hotellook, Telegram, Gemini,
-// and Ollama each used to build their own *http.Client and duplicate the
-// same request→read-body→log sequence by hand. Do centralizes that; each
-// adapter still owns its own request construction (headers, query
+// third-party API goes through — Aviasales, Gemini, and Ollama each used
+// to build their own *http.Client and duplicate the same
+// request→read-body→log sequence by hand (Discord is the one exception:
+// discordgo manages its own HTTP client internally). Do centralizes
+// that; each adapter still owns its own request construction (headers, query
 // params, body) since that's genuinely provider-specific.
 package httpclient
 
@@ -32,7 +33,7 @@ func New(timeout time.Duration) *Client {
 // preview on success, WARN with a longer preview on any status >= 400 —
 // before returning the status code and body for the caller to unmarshal.
 // label identifies the integration and call (e.g. "aviasales: calendar",
-// "telegram: sendMessage") for that log line; it must be a caller-written
+// "gemini: generateContent") for that log line; it must be a caller-written
 // literal, never derived from the request, since the request may carry a
 // token in its URL or headers that must never be logged.
 func (c *Client) Do(ctx context.Context, req *http.Request, label string) (status int, body []byte, err error) {

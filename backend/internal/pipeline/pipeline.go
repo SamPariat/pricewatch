@@ -1,13 +1,14 @@
 // Package pipeline orchestrates one watch's run: fetch → normalize →
 // persist → analyze → render. Sending the result is the scheduler's job,
-// not this package's — RunWatch returns a rendered section and lets the
-// caller decide how many watches' sections to batch into one Notifier.Send
-// call (see PLAN.md § Telegram, "one digest message for all watches").
+// not this package's — RunWatch returns a rendered embed and lets the
+// caller decide how many watches' embeds to batch into one Notifier.Send
+// call (see PLAN.md § Discord, "one digest message for all watches").
 package pipeline
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/SamPariat/pricewatch/internal/ai"
@@ -37,7 +38,7 @@ type Pipeline struct {
 // pings immediately." A zero ThresholdPct means the watch has no
 // threshold configured, so ThresholdBreach is always false for it.
 type RunResult struct {
-	Text            string
+	Embed           domain.Embed
 	ThresholdBreach bool
 }
 
@@ -109,8 +110,8 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 	}
 	p.emit(ctx, runID, "analyze", domain.LevelInfo, "analysis complete", nil)
 
-	text := render.Digest(w, analysis)
-	text = p.Copywriter.Enhance(ctx, w, analysis, text)
+	embed := render.Digest(w, analysis)
+	embed = p.Copywriter.Enhance(ctx, w, analysis, embed)
 	p.emit(ctx, runID, "render", domain.LevelInfo, "section rendered", nil)
 
 	now := p.Clock.Now()
@@ -120,7 +121,7 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 		logging.From(ctx).Error().Err(err).Msg("pipeline: upsert watch state after success")
 	}
 	if err := p.Repo.FinishDigestRun(ctx, domain.DigestRun{
-		RunID: runID, WatchID: w.ID, FinishedAt: &now, Status: domain.RunSuccess, MessageBody: text,
+		RunID: runID, WatchID: w.ID, FinishedAt: &now, Status: domain.RunSuccess, MessageBody: PlainText(embed),
 	}); err != nil {
 		logging.From(ctx).Error().Err(err).Msg("pipeline: finish digest run after success")
 	}
@@ -134,7 +135,29 @@ func (p *Pipeline) RunWatch(ctx context.Context, runID domain.RunID, w domain.Wa
 			fmt.Sprintf("threshold breached: price dropped %.1f%%, watch threshold is %.1f%%", -analysis.Delta.Pct, w.ThresholdPct), nil)
 	}
 
-	return RunResult{Text: text, ThresholdBreach: breach}, nil
+	return RunResult{Embed: embed, ThresholdBreach: breach}, nil
+}
+
+// PlainText flattens an embed into a single human-readable string —
+// used for digest_runs.message_body (an audit column, not something any
+// adapter sends anywhere; the discord adapter sends the structured
+// domain.Embed directly) and reused by service.WatchService.RunNow for
+// the "Run now" API response, which predates embeds and still returns a
+// plain string. Not currently surfaced in the panel UI either way, but
+// kept readable rather than e.g. JSON-encoded in case that changes.
+func PlainText(e domain.Embed) string {
+	var b strings.Builder
+	b.WriteString(e.Title)
+	if e.Description != "" {
+		fmt.Fprintf(&b, "\n%s", e.Description)
+	}
+	for _, f := range e.Fields {
+		fmt.Fprintf(&b, "\n%s: %s", f.Name, f.Value)
+	}
+	if e.Footer != "" {
+		fmt.Fprintf(&b, "\n%s", e.Footer)
+	}
+	return b.String()
 }
 
 // fail records a failed run — a bad watch_state and digest_runs row, not
@@ -328,12 +351,6 @@ func targetDates(w domain.Watch) (depart, ret string, err error) {
 			r = *p.ReturnDate
 		}
 		return p.DepartDate, r, nil
-	case w.Kind == domain.AssetHotel || w.Kind == domain.AssetRental:
-		p, err := w.DecodeHotelParams()
-		if err != nil {
-			return "", "", err
-		}
-		return p.CheckIn, p.CheckOut, nil
 	default:
 		return "", "", fmt.Errorf("pipeline: unknown asset kind %q", w.Kind)
 	}

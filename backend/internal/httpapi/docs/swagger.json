@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.\nVersioned by URL prefix (/api/v1/...) — see internal/httpapi/handlers.APIVersion and internal/httpapi/router.go.",
+        "description": "Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Discord channel status. Single-admin: every route except /auth/login and /meta requires a valid session.\nVersioned by URL prefix (/api/v1/...) — see internal/httpapi/handlers.APIVersion and internal/httpapi/router.go.",
         "title": "Pricewatch API",
         "contact": {},
         "version": "1.0"
@@ -27,7 +27,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.AnalyticsSummary"
                         }
                     },
                     "500": {
@@ -100,7 +100,7 @@
                         "CookieAuth": []
                     }
                 ],
-                "description": "Backs the panel's \"Telegram connected\" indicator — calls the real Telegram getMe endpoint via the Notifier port, so a revoked or wrong bot token shows up immediately rather than only being discovered when a digest silently fails to send.",
+                "description": "Backs the panel's \"Discord connected\" indicator — checks whether the Gateway connection is authenticated via the Notifier port, so a revoked or wrong bot token shows up immediately rather than only being discovered when a digest silently fails to send.",
                 "produces": [
                     "application/json"
                 ],
@@ -138,7 +138,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Meta"
                         }
                     }
                 }
@@ -165,7 +165,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun"
+                                "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.DigestRun"
                             }
                         }
                     },
@@ -208,7 +208,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent"
+                                "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent"
                             }
                         }
                     },
@@ -239,7 +239,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings"
                         }
                     },
                     "500": {
@@ -274,7 +274,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings"
                         }
                     }
                 ],
@@ -282,7 +282,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings"
                         }
                     },
                     "400": {
@@ -321,7 +321,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                                "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch"
                             }
                         }
                     },
@@ -365,7 +365,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch"
                         }
                     },
                     "400": {
@@ -410,7 +410,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch"
                         }
                     },
                     "404": {
@@ -491,7 +491,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch"
                         }
                     },
                     "400": {
@@ -550,7 +550,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History"
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.History"
                         }
                     },
                     "500": {
@@ -569,7 +569,7 @@
                         "CookieAuth": []
                     }
                 ],
-                "description": "Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Telegram, matching the scheduled path's own behavior.",
+                "description": "Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Discord, matching the scheduled path's own behavior.",
                 "produces": [
                     "application/json"
                 ],
@@ -610,7 +610,7 @@
         }
     },
     "definitions": {
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.AnalyticsSummary": {
             "type": "object",
             "properties": {
                 "avg_delta_7d_pct": {
@@ -627,7 +627,7 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.DigestRun": {
             "type": "object",
             "properties": {
                 "error": {
@@ -653,7 +653,7 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.History": {
             "type": "object",
             "properties": {
                 "last_updated_at": {
@@ -665,12 +665,12 @@
                 "samples": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample"
+                        "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSample"
                     }
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Meta": {
             "type": "object",
             "properties": {
                 "current_version": {
@@ -684,7 +684,7 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSample": {
             "type": "object",
             "properties": {
                 "date": {
@@ -705,7 +705,7 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSummary": {
             "type": "object",
             "properties": {
                 "currency": {
@@ -722,7 +722,7 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent": {
             "type": "object",
             "properties": {
                 "at": {
@@ -745,27 +745,31 @@
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings": {
             "type": "object",
             "properties": {
                 "currency": {
                     "type": "string"
                 },
+                "discord_channel_id": {
+                    "type": "string"
+                },
                 "dry_run": {
                     "type": "boolean"
+                },
+                "language": {
+                    "description": "Language is \"en\" or \"hi\" — see internal/i18n.Valid. Drives the\nDiscord digest/alert text; the panel's own UI language is a\nseparate, purely client-side cookie (web/lib/i18n), though the\nlanguage switcher keeps both in sync by PATCHing this field.",
+                    "type": "string"
                 },
                 "quiet_hours_end": {
                     "type": "string"
                 },
                 "quiet_hours_start": {
                     "type": "string"
-                },
-                "telegram_chat_id": {
-                    "type": "string"
                 }
             }
         },
-        "github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch": {
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch": {
             "type": "object",
             "properties": {
                 "consecutive_failures": {
@@ -805,7 +809,7 @@
                     }
                 },
                 "price": {
-                    "$ref": "#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary"
+                    "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSummary"
                 },
                 "stale": {
                     "type": "boolean"

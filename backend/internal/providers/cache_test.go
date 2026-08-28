@@ -69,7 +69,7 @@ func TestWithCache_SecondCallSameWatch_ServedFromCache(t *testing.T) {
 
 // TestWithCache_SkipCache_BypassesAStaleOrEmptyCachedResult locks down the
 // fix for a real bug: a manual "run now" (handlers.API.runNow,
-// telegrambot.Listener.refresh) is supposed to always fetch fresh — but
+// discordbot.Listener.refresh) is supposed to always fetch fresh — but
 // before SkipCache existed, it went through the exact same cached
 // provider as a scheduled run, so a bad or empty result from one fetch
 // (e.g. a watch with backwards depart/return dates) would keep getting

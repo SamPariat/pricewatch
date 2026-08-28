@@ -16,7 +16,7 @@ func New() *Notifier { return &Notifier{} }
 
 func (n *Notifier) Send(ctx context.Context, t domain.Target, m domain.Message) error {
 	logging.From(ctx).Info().
-		Int("chars", len(m.Text)).
+		Int("embeds", len(m.Embeds)).
 		Int("buttons", len(m.Buttons)).
 		Msg("noop notifier: message not sent")
 	return nil

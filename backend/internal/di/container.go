@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/SamPariat/pricewatch/internal/ai"
@@ -19,19 +20,17 @@ import (
 	"github.com/SamPariat/pricewatch/internal/ai/ollama"
 	"github.com/SamPariat/pricewatch/internal/cache"
 	"github.com/SamPariat/pricewatch/internal/config"
+	"github.com/SamPariat/pricewatch/internal/discordbot"
 	"github.com/SamPariat/pricewatch/internal/domain"
 	"github.com/SamPariat/pricewatch/internal/httpapi/handlers"
 	"github.com/SamPariat/pricewatch/internal/httpapi/middleware"
-	"github.com/SamPariat/pricewatch/internal/notify/telegram"
+	"github.com/SamPariat/pricewatch/internal/notify/discord"
 	"github.com/SamPariat/pricewatch/internal/pipeline"
 	"github.com/SamPariat/pricewatch/internal/providers"
 	"github.com/SamPariat/pricewatch/internal/providers/aviasales"
-	"github.com/SamPariat/pricewatch/internal/providers/hotellook"
-	"github.com/SamPariat/pricewatch/internal/providers/rental"
 	"github.com/SamPariat/pricewatch/internal/scheduler"
 	"github.com/SamPariat/pricewatch/internal/service"
 	"github.com/SamPariat/pricewatch/internal/store"
-	"github.com/SamPariat/pricewatch/internal/telegrambot"
 )
 
 const sessionTTL = 7 * 24 * time.Hour
@@ -44,7 +43,7 @@ type Container struct {
 	Pool      *pgxpool.Pool
 	Repo      domain.Repository
 	Scheduler *scheduler.Scheduler
-	Listener  *telegrambot.Listener
+	Listener  *discordbot.Listener
 	API       *handlers.API
 }
 
@@ -87,15 +86,28 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 	registry := providers.NewRegistry()
 	registry.Register(decorate(aviasales.NewOneWay(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
 	registry.Register(decorate(aviasales.NewReturn(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
-	registry.Register(decorate(hotellook.New(string(cfg.TravelpayoutsToken), currency), ristrettoCache, ttlHolder.TTL))
-	registry.Register(rental.New()) // no upstream to call yet — see PLAN.md § Known gaps and risks
 
 	pl := &pipeline.Pipeline{
 		Registry: registry, Repo: repo, Clock: realClock{},
 		Copywriter: buildCopywriter(cfg, ristrettoCache),
 	}
 
-	notifier := telegram.New(string(cfg.TelegramBotToken))
+	// One Session, shared by the Notifier (REST sends — works before and
+	// independent of the Gateway connection below) and the Listener
+	// (which opens that Gateway connection to receive button-click
+	// interactions) — one bot token, matching how the Telegram adapter
+	// this replaced shared its token between its own Notifier and
+	// long-poll Listener. IntentsNone: interaction events (the only
+	// thing this bot listens for) aren't gated by Gateway intents at
+	// all, so requesting any is unnecessary.
+	discordSession, err := discordgo.New("Bot " + string(cfg.DiscordBotToken))
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("di: create discord session: %w", err)
+	}
+	discordSession.Identify.Intents = discordgo.IntentsNone
+
+	notifier := discord.New(discordSession)
 
 	sched := scheduler.New(repo, pl, notifier)
 	ttlHolder.sched = sched
@@ -107,9 +119,9 @@ func New(ctx context.Context, cfg config.Config) (*Container, error) {
 
 	watches := &service.WatchService{Repo: repo, Sched: sched, Pipeline: pl, Notifier: notifier, Clock: realClock{}}
 
-	// Long-poll listener for inline keyboard button presses (Snooze 7d /
-	// Pause / Refresh now — PLAN.md § Telegram).
-	listener := &telegrambot.Listener{Bot: notifier, Repo: repo, Sched: sched, Watches: watches}
+	// Button-interaction listener (Snooze 7d / Pause / Refresh now —
+	// PLAN.md § Discord).
+	listener := &discordbot.Listener{Session: discordSession, Repo: repo, Sched: sched, Watches: watches}
 
 	// One Session instance shared by AuthService (issues tokens on login)
 	// and router.go's RequireAuth middleware (validates them) — both must

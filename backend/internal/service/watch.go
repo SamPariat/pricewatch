@@ -27,8 +27,8 @@ const priceHistoryWindow = 95 * 24 * time.Hour
 // WatchService owns every use case around watches: CRUD, the freshness/
 // staleness aggregation the panel and API both need, and running a watch
 // on demand. RunNow in particular is used identically by the HTTP "Run
-// now" button (internal/httpapi/handlers) and the Telegram "Refresh now"
-// button (internal/telegrambot.Listener) — the whole reason this exists
+// now" button (internal/httpapi/handlers) and the Discord "Refresh now"
+// button (internal/discordbot.Listener) — the whole reason this exists
 // as a shared service instead of staying duplicated in two driving
 // adapters, which it was until this layer existed.
 type WatchService struct {
@@ -179,21 +179,21 @@ func (s *WatchService) Delete(ctx context.Context, id domain.WatchID) error {
 // fetches fresh — that's the point of asking for a run right now.
 // Honours the global dry-run setting for whether the result actually
 // gets sent via the Notifier. This is the single implementation used by
-// both the HTTP "Run now" button and the Telegram "Refresh now" button.
+// both the HTTP "Run now" button and the Discord "Refresh now" button.
 func (s *WatchService) RunNow(ctx context.Context, id domain.WatchID, send bool) (string, error) {
 	w, err := s.Repo.GetWatch(ctx, id)
 	if err != nil {
 		return "", ErrNotFound
 	}
 
-	// The rendered text is shared between the API response and (when
-	// send is true) the actual Telegram message, so it can only be in
+	// The rendered embed is shared between the API response and (when
+	// send is true) the actual Discord message, so it can only be in
 	// one language — Settings.Language wins over whatever locale the
 	// caller's own context carries (an HTTP "Run now" click forwards the
-	// admin's panel language via Accept-Language), since this text is
-	// the real digest content the Telegram group sees, not UI chrome.
-	// The Telegram "Refresh now" button has no locale on its context at
-	// all, so it needs this regardless.
+	// admin's panel language via Accept-Language), since this is the
+	// real digest content the Discord channel sees, not UI chrome. The
+	// Discord "Refresh now" button has no locale on its context at all,
+	// so it needs this regardless.
 	settings, serr := s.Repo.GetSettings(ctx)
 	loc := i18n.From(ctx)
 	if serr == nil && i18n.Valid(settings.Language) {
@@ -208,13 +208,13 @@ func (s *WatchService) RunNow(ctx context.Context, id domain.WatchID, send bool)
 		return "", RunError{err}
 	}
 
-	if send && serr == nil && !settings.DryRun && settings.TelegramChatID != "" {
-		msg := domain.Message{Text: render.CombineDigest([]string{res.Text}, loc)}
-		if err := s.Notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
+	if send && serr == nil && !settings.DryRun && settings.DiscordChannelID != "" {
+		msg := render.CombineDigest([]domain.Embed{res.Embed}, loc)
+		if err := s.Notifier.Send(ctx, domain.Target{ChannelID: settings.DiscordChannelID}, msg); err != nil {
 			logging.From(rctx).Error().Err(err).Msg("run-now: send failed")
 		}
 	}
-	return res.Text, nil
+	return pipeline.PlainText(res.Embed), nil
 }
 
 // History returns the price-history view for one watch, days back from
@@ -310,31 +310,15 @@ func validateWatch(ctx context.Context, w domain.Watch) error {
 			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_timezone", "Error", err.Error()))
 		}
 	}
-	switch {
-	case w.Kind.IsFlight():
-		p, err := w.DecodeFlightParams()
-		if err != nil {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
-		}
-		// json.Unmarshal silently ignores fields it doesn't recognize —
-		// hotel-shaped params ({"location":...}) decode into a
-		// FlightParams{} with every field empty without erroring, so
-		// decoding alone doesn't prove the params actually matched the
-		// kind. Checking the required fields landed does.
-		if p.Origin == "" || p.Destination == "" || p.DepartDate == "" {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_flight_fields", "Kind", w.Kind))
-		}
-		if w.Kind == domain.AssetFlightReturn && (p.ReturnDate == nil || *p.ReturnDate == "") {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_return_date", "Kind", w.Kind))
-		}
-	case w.Kind == domain.AssetHotel || w.Kind == domain.AssetRental:
-		p, err := w.DecodeHotelParams()
-		if err != nil {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
-		}
-		if p.Location == "" || p.CheckIn == "" || p.CheckOut == "" {
-			return fmt.Errorf("%s", i18n.T(loc, "validation.missing_hotel_fields", "Kind", w.Kind))
-		}
+	p, err := w.DecodeFlightParams()
+	if err != nil {
+		return fmt.Errorf("%s", i18n.T(loc, "validation.invalid_params", "Kind", w.Kind, "Error", err.Error()))
+	}
+	if p.Origin == "" || p.Destination == "" || p.DepartDate == "" {
+		return fmt.Errorf("%s", i18n.T(loc, "validation.missing_flight_fields", "Kind", w.Kind))
+	}
+	if w.Kind == domain.AssetFlightReturn && (p.ReturnDate == nil || *p.ReturnDate == "") {
+		return fmt.Errorf("%s", i18n.T(loc, "validation.missing_return_date", "Kind", w.Kind))
 	}
 	return nil
 }

@@ -19,7 +19,7 @@ type skipCacheKey struct{}
 // would otherwise keep serving until it naturally expires.
 //
 // Used by exactly the two "the user explicitly asked for this right now"
-// paths — handlers.API.runNow and telegrambot.Listener.refresh — never by
+// paths — handlers.API.runNow and discordbot.Listener.refresh — never by
 // the scheduler's routine fires, which are supposed to respect the cache
 // (PLAN.md § Caching: "data only changes when the cron fires").
 func SkipCache(ctx context.Context) context.Context {

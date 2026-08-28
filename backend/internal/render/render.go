@@ -1,23 +1,32 @@
-// Package render turns a watch's analysis into a message section. Digest
+// Package render turns a watch's analysis into a Discord embed. Digest
 // is the deterministic template every digest falls back to — the AI
 // features phase (PLAN.md § AI features) wraps this, it never replaces it:
 // the send path must not depend on an LLM being reachable, and an LLM must
 // never be the source of a number, only of phrasing around numbers this
 // package already computed.
 //
-// Formatting here targets Telegram HTML parse mode (bold/code only, no
-// MarkdownV2 — see PLAN.md § Traps: MarkdownV2 needs ~18 characters
-// escaped and is a reliable source of runtime formatting bugs).
+// Digest returns a domain.Embed, not a discordgo type — this package
+// deliberately doesn't import discordgo, so the domain core stays free of
+// any one adapter's SDK (PLAN.md § Architecture patterns). internal/notify/
+// discord is the only place a domain.Embed becomes a discordgo.MessageEmbed.
 package render
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/SamPariat/pricewatch/internal/analytics"
 	"github.com/SamPariat/pricewatch/internal/domain"
 	"github.com/SamPariat/pricewatch/internal/i18n"
+)
+
+// Embed colors — a plain int (0xRRGGBB) rather than an i18n key, since
+// these are visual, not text: down (a lower price than yesterday) reads
+// as good news, up as a caution.
+const (
+	colorNeutral = 0x64748b // slate-500 — no delta to compare against yet
+	colorUp      = 0xef4444 // red-500
+	colorDown    = 0x22c55e // green-500
 )
 
 // Analysis carries everything one watch's digest section needs — the
@@ -53,77 +62,86 @@ type DateRange struct {
 	Depart, Return string
 }
 
-// Digest renders one watch's section. It never returns an error: every
-// input is already validated upstream, and a template must not be a new
-// failure point in the pipeline.
-func Digest(w domain.Watch, a Analysis) string {
-	var b strings.Builder
-
-	fmt.Fprintf(&b, "<b>%s</b>\n", title(w, a.Locale))
-	fmt.Fprintf(&b, "<code>%s</code>", formatPrice(a.PriceMinor, a.Currency))
+// Digest renders one watch's section as an embed. It never returns an
+// error: every input is already validated upstream, and a template must
+// not be a new failure point in the pipeline.
+func Digest(w domain.Watch, a Analysis) domain.Embed {
+	embed := domain.Embed{
+		Title:       title(w, a.Locale),
+		Description: fmt.Sprintf("**%s**", formatPrice(a.PriceMinor, a.Currency)),
+		Color:       colorNeutral,
+	}
 
 	if a.Delta.OK {
-		arrow, wordKey := "▲", "digest.up"
+		arrow, wordKey, color := "▲", "digest.up", colorUp
 		if a.Delta.Pct < 0 {
-			arrow, wordKey = "▼", "digest.down"
+			arrow, wordKey, color = "▼", "digest.down", colorDown
 		}
+		embed.Color = color
 		word := i18n.T(a.Locale, wordKey)
 		pct := fmt.Sprintf("%.1f", absF(a.Delta.Pct))
-		fmt.Fprintf(&b, "  %s", i18n.T(a.Locale, "digest.delta", "Arrow", arrow, "Pct", pct, "Word", word))
+		embed.Fields = append(embed.Fields, domain.EmbedField{
+			Name:   i18n.T(a.Locale, "digest.field_change"),
+			Value:  i18n.T(a.Locale, "digest.delta", "Arrow", arrow, "Pct", pct, "Word", word),
+			Inline: true,
+		})
 	}
-	b.WriteString("\n")
 
 	if a.PercentileOK {
 		pct := fmt.Sprintf("%.0f", a.Percentile)
-		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.cheaper_than_pct", "Pct", pct))
+		embed.Fields = append(embed.Fields, domain.EmbedField{
+			Name:   i18n.T(a.Locale, "digest.field_percentile"),
+			Value:  i18n.T(a.Locale, "digest.cheaper_than_pct", "Pct", pct),
+			Inline: true,
+		})
 	}
+
 	if a.AllTimeLow.OK && a.AllTimeLow.PriceMinor < a.PriceMinor {
-		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.all_time_low",
-			"Price", formatPrice(a.AllTimeLow.PriceMinor, a.Currency), "Date", a.AllTimeLow.Date.Format("Jan 2")))
+		embed.Fields = append(embed.Fields, domain.EmbedField{
+			Name: i18n.T(a.Locale, "digest.field_all_time_low"),
+			Value: i18n.T(a.Locale, "digest.all_time_low",
+				"Price", formatPrice(a.AllTimeLow.PriceMinor, a.Currency), "Date", a.AllTimeLow.Date.Format("Jan 2")),
+			Inline: true,
+		})
 	}
+
 	if a.NearestMatch != (DateRange{}) {
 		dates := displayDate(a.NearestMatch.Depart)
 		if a.NearestMatch.Return != "" {
 			dates += " → " + displayDate(a.NearestMatch.Return)
 		}
-		fmt.Fprintf(&b, "%s\n", i18n.T(a.Locale, "digest.no_exact_match", "Dates", dates))
+		embed.Footer = i18n.T(a.Locale, "digest.no_exact_match", "Dates", dates)
 	}
 
-	return strings.TrimRight(b.String(), "\n")
+	return embed
 }
 
-// CombineDigest joins per-watch sections into one message — PLAN.md
-// § Telegram: "One digest message for all watches, not one per watch."
-// It does not yet split across Telegram's 4096-char limit; that belongs
-// with the real Telegram adapter (PLAN.md Phase 6), which is also where
-// the truncation would need to become multiple Send calls rather than a
-// silently-cut message.
-func CombineDigest(sections []string, loc i18n.Locale) string {
+// CombineDigest joins per-watch embeds into one message — PLAN.md §
+// Discord: "one digest message for all watches, not one per watch."
+// Discord allows up to 10 embeds in a single message, which is what
+// makes this trivial compared to the old Telegram HTML-string
+// concatenation this replaced: each watch keeps its own embed instead of
+// being flattened into shared text.
+func CombineDigest(embeds []domain.Embed, loc i18n.Locale) domain.Message {
 	key := "digest.header_plural"
-	if len(sections) == 1 {
+	if len(embeds) == 1 {
 		key = "digest.header_singular"
 	}
-	header := fmt.Sprintf("<b>%s</b>", i18n.T(loc, key, "Count", len(sections)))
-	parts := append([]string{header}, sections...)
-	return strings.Join(parts, "\n\n")
+	return domain.Message{
+		Content: i18n.T(loc, key, "Count", len(embeds)),
+		Embeds:  embeds,
+	}
 }
 
 func title(w domain.Watch, loc i18n.Locale) string {
 	if w.Name != "" {
 		return w.Name
 	}
-	switch {
-	case w.Kind.IsFlight():
-		if p, err := w.DecodeFlightParams(); err == nil {
-			if p.ReturnDate != nil {
-				return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_return"))
-			}
-			return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_oneway"))
+	if p, err := w.DecodeFlightParams(); err == nil {
+		if p.ReturnDate != nil {
+			return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_return"))
 		}
-	case w.Kind == domain.AssetHotel, w.Kind == domain.AssetRental:
-		if p, err := w.DecodeHotelParams(); err == nil {
-			return p.Location
-		}
+		return fmt.Sprintf("%s → %s %s", p.Origin, p.Destination, i18n.T(loc, "digest.flight_oneway"))
 	}
 	return string(w.Kind)
 }
