@@ -103,7 +103,7 @@ func TestReload_Interval_MatchesScheduleGap(t *testing.T) {
 }
 
 // recordingNotifier captures the last Message sent, so tests can assert
-// on Buttons without a real Telegram client.
+// on Buttons without a real Discord client.
 type recordingNotifier struct {
 	sent []domain.Message
 }
@@ -140,7 +140,7 @@ func TestFireGroup_SingleWatch_AttachesSnoozeButtons(t *testing.T) {
 	repo := storetest.New()
 	w := flightWatch(t, "solo", "0 7 * * *")
 	repo.SeedWatch(w)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 
 	registry := providers.NewRegistry()
 	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
@@ -164,7 +164,7 @@ func TestFireGroup_MultipleWatches_NoButtons(t *testing.T) {
 	w2 := flightWatch(t, "multi2", "0 7 * * *")
 	repo.SeedWatch(w1)
 	repo.SeedWatch(w2)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 
 	registry := providers.NewRegistry()
 	registry.Register(&succeedingProvider{kind: domain.AssetFlightOneWay})
@@ -186,7 +186,7 @@ func TestFireGroup_SkipsSnoozedWatch(t *testing.T) {
 	repo := storetest.New()
 	w := flightWatch(t, "snoozed", "0 7 * * *")
 	repo.SeedWatch(w)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	until := time.Now().Add(7 * 24 * time.Hour)
 	if err := repo.SetSnooze(context.Background(), w.ID, &until); err != nil {
 		t.Fatal(err)
@@ -209,7 +209,7 @@ func TestFireGroup_ExpiredSnooze_StillRuns(t *testing.T) {
 	repo := storetest.New()
 	w := flightWatch(t, "expired-snooze", "0 7 * * *")
 	repo.SeedWatch(w)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	past := time.Now().Add(-time.Hour) // snooze already lapsed
 	if err := repo.SetSnooze(context.Background(), w.ID, &past); err != nil {
 		t.Fatal(err)
@@ -244,7 +244,7 @@ func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	w := flightWatch(t, "cheap", "0 7 * * *")
 	w.ThresholdPct = 10
 	repo.SeedWatch(w)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
 		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
 	}); err != nil {
@@ -262,14 +262,14 @@ func TestFireGroup_ThresholdBreach_SendsExtraAlert(t *testing.T) {
 	if len(notifier.sent) != 2 {
 		t.Fatalf("got %d sends, want 2 (threshold alert + digest)", len(notifier.sent))
 	}
-	if !strings.Contains(notifier.sent[0].Text, "Threshold alert") {
-		t.Errorf("expected the first send to be the threshold alert, got: %q", notifier.sent[0].Text)
+	if !strings.Contains(notifier.sent[0].Content, "Threshold alert") {
+		t.Errorf("expected the first send to be the threshold alert, got: %q", notifier.sent[0].Content)
 	}
 	if len(notifier.sent[0].Buttons) == 0 {
 		t.Error("expected snooze/pause/refresh buttons on the threshold alert")
 	}
-	if strings.Contains(notifier.sent[1].Text, "Threshold alert") {
-		t.Errorf("expected the second send to be the normal digest, got: %q", notifier.sent[1].Text)
+	if strings.Contains(notifier.sent[1].Content, "Threshold alert") {
+		t.Errorf("expected the second send to be the normal digest, got: %q", notifier.sent[1].Content)
 	}
 }
 
@@ -281,7 +281,7 @@ func TestFireGroup_NoThreshold_SendsOnlyDigest(t *testing.T) {
 	now := time.Date(2026, 8, 24, 7, 0, 0, 0, time.UTC)
 	w := flightWatch(t, "no-threshold", "0 7 * * *") // ThresholdPct left at zero value
 	repo.SeedWatch(w)
-	repo.UpdateSettings(context.Background(), domain.Settings{TelegramChatID: "chat1", Currency: "INR"})
+	repo.UpdateSettings(context.Background(), domain.Settings{DiscordChannelID: "chat1", Currency: "INR"})
 	if err := repo.UpsertPriceSample(context.Background(), domain.PriceSample{
 		WatchID: w.ID, SampleDate: now.AddDate(0, 0, -1), MedianMinor: 1000000, MinMinor: 1000000, MaxMinor: 1000000, NQuotes: 1,
 	}); err != nil {

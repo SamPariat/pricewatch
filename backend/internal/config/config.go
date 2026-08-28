@@ -21,7 +21,7 @@ type Config struct {
 
 	DatabaseURL logging.Secret
 
-	TelegramBotToken   logging.Secret
+	DiscordBotToken    logging.Secret
 	TravelpayoutsToken logging.Secret
 
 	GeminiAPIKey logging.Secret // optional — AI features disabled if empty
@@ -53,7 +53,7 @@ func Load() (Config, error) {
 		Env:                envOr("APP_ENV", "development"),
 		Port:               envOr("PORT", "8080"),
 		DatabaseURL:        logging.Secret(req("DATABASE_URL")),
-		TelegramBotToken:   logging.Secret(req("TELEGRAM_BOT_TOKEN")),
+		DiscordBotToken:    logging.Secret(req("DISCORD_BOT_TOKEN")),
 		TravelpayoutsToken: logging.Secret(req("TRAVELPAYOUTS_TOKEN")),
 		GeminiAPIKey:       logging.Secret(os.Getenv("GEMINI_API_KEY")), // optional
 		GeminiModel:        os.Getenv("GEMINI_MODEL"),                   // optional

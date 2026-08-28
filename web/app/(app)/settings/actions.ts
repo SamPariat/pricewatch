@@ -8,7 +8,7 @@ import { LOCALE_COOKIE, isLocale } from "@/i18n/request";
 import type { FormState } from "@/app/(app)/watches/actions";
 
 // language drives both the panel's own UI (via the pw_locale cookie —
-// web/i18n/request.ts) and the Telegram digest/alert text (via
+// web/i18n/request.ts) and the Discord digest/alert text (via
 // Settings.language on the backend — see backend/internal/i18n). One
 // form field, two places it takes effect, kept in sync here rather than
 // exposing two separate controls for what the user experiences as one
@@ -18,7 +18,7 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
   const t = await getTranslations("settings");
   try {
     await api.updateSettings({
-      telegram_chat_id: String(formData.get("telegram_chat_id") ?? ""),
+      discord_channel_id: String(formData.get("discord_channel_id") ?? ""),
       quiet_hours_start: String(formData.get("quiet_hours_start") ?? ""),
       quiet_hours_end: String(formData.get("quiet_hours_end") ?? ""),
       currency: String(formData.get("currency") ?? "INR"),

@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Pricewatch",
-  description: "Daily flight, hotel, and rental price tracking with Telegram digests",
+  description: "Daily flight price tracking with Discord digests",
   // No manual `manifest:` link here — app/manifest.ts is a Next.js file
   // convention (like sitemap.ts) that's auto-linked into <head> on its
   // own; a hardcoded "/manifest.json" would point at a URL that doesn't

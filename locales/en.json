@@ -52,8 +52,7 @@
       "invalid_timezone": "invalid timezone: {Error}",
       "invalid_params": "invalid params for kind \"{Kind}\": {Error}",
       "missing_flight_fields": "invalid params for kind \"{Kind}\": origin, destination, and depart_date are required",
-      "missing_return_date": "invalid params for kind \"{Kind}\": return_date is required",
-      "missing_hotel_fields": "invalid params for kind \"{Kind}\": location, check_in, and check_out are required"
+      "missing_return_date": "invalid params for kind \"{Kind}\": return_date is required"
     },
     "digest": {
       "header_singular": "Daily digest — {Count} watch",
@@ -61,8 +60,11 @@
       "up": "up",
       "down": "down",
       "delta": "{Arrow} {Pct}% ({Word} vs yesterday)",
+      "field_change": "Change",
       "cheaper_than_pct": "Cheaper than {Pct}% of the last 90 days",
-      "all_time_low": "All-time low: {Price} on {Date}",
+      "field_percentile": "90-day percentile",
+      "all_time_low": "{Price} on {Date}",
+      "field_all_time_low": "All-time low",
       "no_exact_match": "⚠️ No exact match — nearest fare found is {Dates}",
       "flight_return": "· return",
       "flight_oneway": "· one-way"
@@ -70,7 +72,7 @@
     "alert": {
       "threshold_header": "🔔 Threshold alert"
     },
-    "telegram": {
+    "discord": {
       "snoozed": "Snoozed for 7 days.",
       "snooze_failed": "Failed to snooze — try again from the panel.",
       "watch_not_found": "Watch not found.",
@@ -87,8 +89,8 @@
     "signOut": "Sign out"
   },
   "channel": {
-    "connected": "Telegram connected",
-    "disconnected": "Telegram disconnected"
+    "connected": "Discord connected",
+    "disconnected": "Discord disconnected"
   },
   "common": {
     "saving": "Saving…",
@@ -145,15 +147,10 @@
     "typeLabel": "Type",
     "kindOneWay": "One-way",
     "kindReturn": "Return",
-    "kindHotel": "Hotel",
-    "kindRental": "Rental",
     "originLabel": "Origin (IATA)",
     "destinationLabel": "Destination (IATA)",
     "departDateLabel": "Depart date",
     "returnDateLabel": "Return date",
-    "locationLabel": "Location",
-    "checkInLabel": "Check-in",
-    "checkOutLabel": "Check-out",
     "hourLabel": "Check time (hour)",
     "minuteLabel": "Check time (minute)",
     "timezoneLabel": "Timezone",
@@ -166,7 +163,7 @@
   },
   "newWatch": {
     "title": "New watch",
-    "subtitle": "Track a flight, hotel, or rental's price over time."
+    "subtitle": "Track a flight's price over time."
   },
   "editWatch": {
     "title": "Edit watch"
@@ -203,19 +200,19 @@
   },
   "settings": {
     "title": "Settings",
-    "telegramSection": "Telegram",
-    "chatIdLabel": "Chat ID",
-    "chatIdHelp": "Add the bot to your group, then find its chat ID via the Bot API's getUpdates endpoint.",
+    "discordSection": "Discord",
+    "channelIdLabel": "Channel ID",
+    "channelIdHelp": "Enable Developer Mode in Discord, invite the bot to your server, then right-click the channel and Copy Channel ID.",
     "notificationsSection": "Notifications",
     "quietStartLabel": "Quiet hours start",
     "quietEndLabel": "Quiet hours end",
     "dataSection": "Data",
     "currencyLabel": "Default currency",
     "dryRunLabel": "Dry-run mode",
-    "dryRunHelp": "Runs fetch and render but never sends to Telegram.",
+    "dryRunHelp": "Runs fetch and render but never sends to Discord.",
     "languageSection": "Language",
     "languageLabel": "App and digest language",
-    "languageHelp": "Changes both this panel's language and the language of the Telegram digest and alerts.",
+    "languageHelp": "Changes both this panel's language and the language of the Discord digest and alerts.",
     "languageEnglish": "English",
     "languageHindi": "हिन्दी (Hindi)",
     "saving": "Saving…",

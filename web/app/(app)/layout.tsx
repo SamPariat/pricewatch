@@ -13,7 +13,7 @@ async function ChannelPill() {
   try {
     status = (await api.getChannelStatus()).status;
   } catch {
-    // Backend unreachable or Telegram check failed — show disconnected
+    // Backend unreachable or Discord check failed — show disconnected
     // rather than crashing the whole shell over a status indicator.
   }
   return (

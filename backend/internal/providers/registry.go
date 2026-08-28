@@ -1,7 +1,7 @@
-// Package providers holds the Provider port's adapters (aviasales,
-// hotellook, rental) plus the resilience/caching decorator stack described
-// in PLAN.md — each decorator satisfies domain.Provider itself, so they
-// compose without any adapter knowing about retry, caching, or rate limits.
+// Package providers holds the Provider port's adapters (aviasales) plus
+// the resilience/caching decorator stack described in PLAN.md — each
+// decorator satisfies domain.Provider itself, so they compose without
+// any adapter knowing about retry, caching, or rate limits.
 package providers
 
 import (

@@ -52,8 +52,7 @@
       "invalid_timezone": "अमान्य समय क्षेत्र: {Error}",
       "invalid_params": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: {Error}",
       "missing_flight_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: origin, destination और depart_date आवश्यक हैं",
-      "missing_return_date": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: return_date आवश्यक है",
-      "missing_hotel_fields": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: location, check_in और check_out आवश्यक हैं"
+      "missing_return_date": "\"{Kind}\" किस्म के लिए अमान्य पैरामीटर: return_date आवश्यक है"
     },
     "digest": {
       "header_singular": "दैनिक डाइजेस्ट — {Count} वॉच",
@@ -61,8 +60,11 @@
       "up": "ऊपर",
       "down": "नीचे",
       "delta": "{Arrow} {Pct}% (कल की तुलना में {Word})",
+      "field_change": "बदलाव",
       "cheaper_than_pct": "पिछले 90 दिनों के {Pct}% से सस्ता",
-      "all_time_low": "सर्वकालिक न्यूनतम: {Price}, {Date} को",
+      "field_percentile": "90-दिन पर्सेंटाइल",
+      "all_time_low": "{Price}, {Date} को",
+      "field_all_time_low": "सर्वकालिक न्यूनतम",
       "no_exact_match": "⚠️ सटीक मिलान नहीं — निकटतम किराया {Dates} मिला",
       "flight_return": "· राउंड ट्रिप",
       "flight_oneway": "· वन-वे"
@@ -70,7 +72,7 @@
     "alert": {
       "threshold_header": "🔔 सीमा अलर्ट"
     },
-    "telegram": {
+    "discord": {
       "snoozed": "7 दिनों के लिए स्नूज़ किया गया।",
       "snooze_failed": "स्नूज़ विफल — कृपया पैनल से पुनः प्रयास करें।",
       "watch_not_found": "वॉच नहीं मिला।",
@@ -87,8 +89,8 @@
     "signOut": "साइन आउट"
   },
   "channel": {
-    "connected": "Telegram जुड़ा हुआ है",
-    "disconnected": "Telegram डिस्कनेक्ट है"
+    "connected": "Discord जुड़ा हुआ है",
+    "disconnected": "Discord डिस्कनेक्ट है"
   },
   "common": {
     "saving": "सहेजा जा रहा है…",
@@ -145,15 +147,10 @@
     "typeLabel": "प्रकार",
     "kindOneWay": "वन-वे",
     "kindReturn": "राउंड ट्रिप",
-    "kindHotel": "होटल",
-    "kindRental": "रेंटल",
     "originLabel": "प्रस्थान (IATA)",
     "destinationLabel": "गंतव्य (IATA)",
     "departDateLabel": "प्रस्थान तिथि",
     "returnDateLabel": "वापसी तिथि",
-    "locationLabel": "स्थान",
-    "checkInLabel": "चेक-इन",
-    "checkOutLabel": "चेक-आउट",
     "hourLabel": "जांच का समय (घंटा)",
     "minuteLabel": "जांच का समय (मिनट)",
     "timezoneLabel": "समय क्षेत्र",
@@ -166,7 +163,7 @@
   },
   "newWatch": {
     "title": "नया वॉच",
-    "subtitle": "फ्लाइट, होटल या रेंटल की कीमत समय के साथ ट्रैक करें।"
+    "subtitle": "फ्लाइट की कीमत समय के साथ ट्रैक करें।"
   },
   "editWatch": {
     "title": "वॉच संपादित करें"
@@ -203,19 +200,19 @@
   },
   "settings": {
     "title": "सेटिंग्स",
-    "telegramSection": "Telegram",
-    "chatIdLabel": "चैट ID",
-    "chatIdHelp": "बॉट को अपने ग्रुप में जोड़ें, फिर Bot API के getUpdates एंडपॉइंट से उसकी चैट ID पता करें।",
+    "discordSection": "Discord",
+    "channelIdLabel": "चैनल ID",
+    "channelIdHelp": "Discord में डेवलपर मोड चालू करें, बॉट को अपने सर्वर में जोड़ें, फिर चैनल पर राइट-क्लिक करके Copy Channel ID चुनें।",
     "notificationsSection": "सूचनाएं",
     "quietStartLabel": "शांत समय शुरू",
     "quietEndLabel": "शांत समय समाप्त",
     "dataSection": "डेटा",
     "currencyLabel": "डिफ़ॉल्ट मुद्रा",
     "dryRunLabel": "ड्राई-रन मोड",
-    "dryRunHelp": "फ़ेच और रेंडर करता है लेकिन कभी Telegram पर नहीं भेजता।",
+    "dryRunHelp": "फ़ेच और रेंडर करता है लेकिन कभी Discord पर नहीं भेजता।",
     "languageSection": "भाषा",
     "languageLabel": "ऐप और डाइजेस्ट की भाषा",
-    "languageHelp": "इससे इस पैनल की भाषा और Telegram डाइजेस्ट व अलर्ट की भाषा दोनों बदल जाती हैं।",
+    "languageHelp": "इससे इस पैनल की भाषा और Discord डाइजेस्ट व अलर्ट की भाषा दोनों बदल जाती हैं।",
     "languageEnglish": "English",
     "languageHindi": "हिन्दी (Hindi)",
     "saving": "सहेजा जा रहा है…",

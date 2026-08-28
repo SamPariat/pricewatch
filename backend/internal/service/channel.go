@@ -10,10 +10,11 @@ type ChannelService struct {
 	Notifier domain.Notifier
 }
 
-// Status backs the panel's "Telegram connected" indicator — calls the
-// real Telegram getMe endpoint via the Notifier port, so a revoked or
-// wrong bot token shows up immediately rather than only being discovered
-// when a digest silently fails to send.
+// Status backs the panel's "Discord connected" indicator — checks
+// whether the Gateway connection is authenticated via the Notifier port
+// (see internal/notify/discord.Notifier.Status), so a revoked or wrong
+// bot token shows up immediately rather than only being discovered when
+// a digest silently fails to send.
 func (s *ChannelService) Status(ctx context.Context) (domain.NotifierStatus, error) {
 	return s.Notifier.Status(ctx)
 }

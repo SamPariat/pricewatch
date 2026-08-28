@@ -81,7 +81,7 @@ func TestHTTPResponse_LongBody_TruncatedWithMarker(t *testing.T) {
 	buf := &bytes.Buffer{}
 	ctx := loggerCtx(buf)
 	long := strings.Repeat("x", bodyPreviewWarn+100)
-	HTTPResponse(ctx, "telegram: sendMessage", 500, time.Millisecond, []byte(long))
+	HTTPResponse(ctx, "discord: sendMessage", 500, time.Millisecond, []byte(long))
 
 	m := captured(t, buf)
 	body, ok := m["body"].(string)

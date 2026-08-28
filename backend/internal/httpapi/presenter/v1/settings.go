@@ -3,13 +3,13 @@ package v1
 import "github.com/SamPariat/pricewatch/internal/domain"
 
 type Settings struct {
-	TelegramChatID  string `json:"telegram_chat_id"`
-	QuietHoursStart string `json:"quiet_hours_start"`
-	QuietHoursEnd   string `json:"quiet_hours_end"`
-	Currency        string `json:"currency"`
-	DryRun          bool   `json:"dry_run"`
+	DiscordChannelID string `json:"discord_channel_id"`
+	QuietHoursStart  string `json:"quiet_hours_start"`
+	QuietHoursEnd    string `json:"quiet_hours_end"`
+	Currency         string `json:"currency"`
+	DryRun           bool   `json:"dry_run"`
 	// Language is "en" or "hi" — see internal/i18n.Valid. Drives the
-	// Telegram digest/alert text; the panel's own UI language is a
+	// Discord digest/alert text; the panel's own UI language is a
 	// separate, purely client-side cookie (web/lib/i18n), though the
 	// language switcher keeps both in sync by PATCHing this field.
 	Language string `json:"language"`
@@ -17,7 +17,7 @@ type Settings struct {
 
 func SettingsOf(s domain.Settings) Settings {
 	return Settings{
-		TelegramChatID: s.TelegramChatID, QuietHoursStart: s.QuietHoursStart,
+		DiscordChannelID: s.DiscordChannelID, QuietHoursStart: s.QuietHoursStart,
 		QuietHoursEnd: s.QuietHoursEnd, Currency: s.Currency, DryRun: s.DryRun,
 		Language: s.Language,
 	}
@@ -25,7 +25,7 @@ func SettingsOf(s domain.Settings) Settings {
 
 func (s Settings) ToDomain() domain.Settings {
 	return domain.Settings{
-		TelegramChatID: s.TelegramChatID, QuietHoursStart: s.QuietHoursStart,
+		DiscordChannelID: s.DiscordChannelID, QuietHoursStart: s.QuietHoursStart,
 		QuietHoursEnd: s.QuietHoursEnd, Currency: s.Currency, DryRun: s.DryRun,
 		Language: s.Language,
 	}
@@ -40,10 +40,7 @@ type Meta struct {
 }
 
 // AnalyticsSummary backs GET /api/analytics/summary — the dashboard KPI
-// row. Scoped to what's actually computable today: no "alerts sent"
-// figure, since threshold alerts (PLAN.md § Further suggestions) aren't
-// built yet, and a summary must not report a number for a feature that
-// doesn't exist.
+// row. Scoped to what's actually computable today.
 type AnalyticsSummary struct {
 	TotalWatches   int      `json:"total_watches"`
 	EnabledWatches int      `json:"enabled_watches"`

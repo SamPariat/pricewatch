@@ -61,8 +61,8 @@ type WatchState struct {
 	LastAttemptAt       *time.Time
 	LastError           string
 	ConsecutiveFailures int
-	// SnoozedUntil is set by the Telegram "Snooze 7d" button (PLAN.md §
-	// Telegram). While in the future, the scheduler skips this watch's
+	// SnoozedUntil is set by the Discord "Snooze 7d" button (PLAN.md §
+	// Discord). While in the future, the scheduler skips this watch's
 	// fires entirely — no fetch, no send — rather than disabling it
 	// outright, so it resumes on its own without the user having to
 	// remember to re-enable it.

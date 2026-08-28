@@ -17,11 +17,11 @@ export function SettingsForm({ settings }: { settings: Settings }) {
   return (
     <form action={formAction} className="flex flex-col gap-6">
       <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-sm font-semibold">{t("telegramSection")}</h2>
+        <h2 className="text-sm font-semibold">{t("discordSection")}</h2>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="telegram_chat_id">{t("chatIdLabel")}</Label>
-          <Input id="telegram_chat_id" name="telegram_chat_id" defaultValue={settings.telegram_chat_id} placeholder="-100482910" />
-          <p className="text-[11.5px] text-muted-foreground">{t("chatIdHelp")}</p>
+          <Label htmlFor="discord_channel_id">{t("channelIdLabel")}</Label>
+          <Input id="discord_channel_id" name="discord_channel_id" defaultValue={settings.discord_channel_id} placeholder="1234567890123456789" />
+          <p className="text-[11.5px] text-muted-foreground">{t("channelIdHelp")}</p>
         </div>
       </section>
 

@@ -140,7 +140,7 @@ func TestCreateWatch_ParamsMismatchedToKind_Returns400(t *testing.T) {
 
 	body := map[string]any{
 		"name": "bad params", "kind": "flight_return", "cron_expr": "0 7 * * *", "timezone": "UTC",
-		"params": map[string]any{"location": "Goa"}, // hotel-shaped params on a flight watch
+		"params": map[string]any{"location": "Goa"}, // params missing the required flight fields
 	}
 	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
 	if resp.StatusCode != http.StatusBadRequest {

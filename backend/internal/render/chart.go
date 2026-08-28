@@ -12,11 +12,11 @@ import (
 	"github.com/SamPariat/pricewatch/internal/domain"
 )
 
-// Chart renders a watch's price history to a PNG for Telegram's sendPhoto
-// — pure-Go rendering (no headless browser, no JS), which matters for a
-// distroless container with nothing else installed. Samples need not be
-// sorted; this sorts them itself so callers can pass repository results
-// directly.
+// Chart renders a watch's price history to a PNG for a Discord embed's
+// image attachment — pure-Go rendering (no headless browser, no JS),
+// which matters for a distroless container with nothing else installed.
+// Samples need not be sorted; this sorts them itself so callers can pass
+// repository results directly.
 func Chart(samples []domain.PriceSample, currency string) ([]byte, error) {
 	if len(samples) == 0 {
 		return nil, fmt.Errorf("render: chart: no samples to plot")

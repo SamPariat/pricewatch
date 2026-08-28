@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,52 +12,59 @@ import (
 	"github.com/SamPariat/pricewatch/internal/render"
 )
 
+func templateEmbed() domain.Embed {
+	return domain.Embed{Title: "template title", Description: "template text"}
+}
+
 func TestEnhance_NilLLM_ReturnsTemplateUnchanged(t *testing.T) {
 	c := &Copywriter{}
-	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, "template text")
-	if got != "template text" {
-		t.Errorf("got %q, want template unchanged", got)
+	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, templateEmbed())
+	if !reflect.DeepEqual(got, templateEmbed()) {
+		t.Errorf("got %+v, want template unchanged", got)
 	}
 }
 
 func TestEnhance_NilCopywriter_ReturnsTemplateUnchanged(t *testing.T) {
 	var c *Copywriter
-	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, "template text")
-	if got != "template text" {
-		t.Errorf("got %q, want template unchanged", got)
+	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, templateEmbed())
+	if !reflect.DeepEqual(got, templateEmbed()) {
+		t.Errorf("got %+v, want template unchanged", got)
 	}
 }
 
 func TestEnhance_CleanLine_AppendsItalicized(t *testing.T) {
 	c := &Copywriter{LLM: &fakeLLM{text: "a solid day to book"}}
-	got := c.Enhance(context.Background(), domain.Watch{Name: "BLR to GOI"}, render.Analysis{}, "template text")
-	want := "template text\n<i>a solid day to book</i>"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+	got := c.Enhance(context.Background(), domain.Watch{Name: "BLR to GOI"}, render.Analysis{}, templateEmbed())
+	want := "template text\n*a solid day to book*"
+	if got.Description != want {
+		t.Errorf("Description = %q, want %q", got.Description, want)
+	}
+	if got.Title != "template title" {
+		t.Errorf("Title = %q, want it left untouched", got.Title)
 	}
 }
 
 func TestEnhance_LineWithDigit_RejectedFallsBackToTemplate(t *testing.T) {
 	c := &Copywriter{LLM: &fakeLLM{text: "down 12 percent, book now"}}
-	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, "template text")
-	if got != "template text" {
-		t.Errorf("got %q, want template unchanged when the LLM output contains a digit", got)
+	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, templateEmbed())
+	if !reflect.DeepEqual(got, templateEmbed()) {
+		t.Errorf("got %+v, want template unchanged when the LLM output contains a digit", got)
 	}
 }
 
 func TestEnhance_LLMError_ReturnsTemplateUnchanged(t *testing.T) {
 	c := &Copywriter{LLM: &fakeLLM{err: errors.New("upstream down")}}
-	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, "template text")
-	if got != "template text" {
-		t.Errorf("got %q, want template unchanged on LLM error", got)
+	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, templateEmbed())
+	if !reflect.DeepEqual(got, templateEmbed()) {
+		t.Errorf("got %+v, want template unchanged on LLM error", got)
 	}
 }
 
 func TestEnhance_EmptyLine_RejectedFallsBackToTemplate(t *testing.T) {
 	c := &Copywriter{LLM: &fakeLLM{text: "   "}}
-	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, "template text")
-	if got != "template text" {
-		t.Errorf("got %q, want template unchanged for a blank LLM response", got)
+	got := c.Enhance(context.Background(), domain.Watch{}, render.Analysis{}, templateEmbed())
+	if !reflect.DeepEqual(got, templateEmbed()) {
+		t.Errorf("got %+v, want template unchanged for a blank LLM response", got)
 	}
 }
 

@@ -18,7 +18,7 @@ func (s *SettingsService) Get(ctx context.Context) (domain.Settings, error) {
 // Update persists a full-replace of Settings. Language falls back to
 // English on anything i18n doesn't recognize (empty, a typo, a locale
 // this app has no catalog for) rather than persisting it verbatim —
-// Settings.Language drives the Telegram digest's actual text, so a bad
+// Settings.Language drives the Discord digest's actual text, so a bad
 // value here would silently corrupt every future digest, not just fail
 // a form submission.
 func (s *SettingsService) Update(ctx context.Context, in domain.Settings) (domain.Settings, error) {

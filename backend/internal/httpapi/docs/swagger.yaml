@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.AnalyticsSummary:
     properties:
       avg_delta_7d_pct:
         type: number
@@ -11,7 +11,7 @@ definitions:
       total_watches:
         type: integer
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.DigestRun:
     properties:
       error:
         type: string
@@ -28,7 +28,7 @@ definitions:
       watch_id:
         type: string
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.History:
     properties:
       last_updated_at:
         type: string
@@ -36,10 +36,10 @@ definitions:
         type: string
       samples:
         items:
-          $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample'
+          $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSample'
         type: array
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Meta:
     properties:
       current_version:
         type: string
@@ -48,7 +48,7 @@ definitions:
           type: string
         type: array
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSample:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSample:
     properties:
       date:
         description: YYYY-MM-DD
@@ -62,7 +62,7 @@ definitions:
       n_quotes:
         type: integer
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSummary:
     properties:
       currency:
         type: string
@@ -73,7 +73,7 @@ definitions:
       price_minor:
         type: integer
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent:
     properties:
       at:
         type: string
@@ -88,20 +88,27 @@ definitions:
       stage:
         type: string
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings:
     properties:
       currency:
         type: string
+      discord_channel_id:
+        type: string
       dry_run:
         type: boolean
+      language:
+        description: |-
+          Language is "en" or "hi" — see internal/i18n.Valid. Drives the
+          Discord digest/alert text; the panel's own UI language is a
+          separate, purely client-side cookie (web/lib/i18n), though the
+          language switcher keeps both in sync by PATCHing this field.
+        type: string
       quiet_hours_end:
         type: string
       quiet_hours_start:
         type: string
-      telegram_chat_id:
-        type: string
     type: object
-  github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch:
+  github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch:
     properties:
       consecutive_failures:
         type: integer
@@ -128,7 +135,7 @@ definitions:
           type: integer
         type: array
       price:
-        $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.PriceSummary'
+        $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.PriceSummary'
       stale:
         type: boolean
       threshold_pct:
@@ -175,7 +182,7 @@ definitions:
 info:
   contact: {}
   description: |-
-    Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Telegram channel status. Single-admin: every route except /auth/login and /meta requires a valid session.
+    Backend for the Pricewatch admin panel — watches, price history, run logs, settings, and Discord channel status. Single-admin: every route except /auth/login and /meta requires a valid session.
     Versioned by URL prefix (/api/v1/...) — see internal/httpapi/handlers.APIVersion and internal/httpapi/router.go.
   title: Pricewatch API
   version: "1.0"
@@ -192,7 +199,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.AnalyticsSummary'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.AnalyticsSummary'
         "500":
           description: list watches
           schema:
@@ -245,10 +252,10 @@ paths:
       - auth
   /channel/status:
     get:
-      description: Backs the panel's "Telegram connected" indicator — calls the real
-        Telegram getMe endpoint via the Notifier port, so a revoked or wrong bot token
-        shows up immediately rather than only being discovered when a digest silently
-        fails to send.
+      description: Backs the panel's "Discord connected" indicator — checks whether
+        the Gateway connection is authenticated via the Notifier port, so a revoked
+        or wrong bot token shows up immediately rather than only being discovered
+        when a digest silently fails to send.
       produces:
       - application/json
       responses:
@@ -275,7 +282,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Meta'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Meta'
       summary: Supported API version
       tags:
       - meta
@@ -290,7 +297,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.DigestRun'
+              $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.DigestRun'
             type: array
         "500":
           description: list runs
@@ -318,7 +325,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.RunEvent'
+              $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent'
             type: array
         "500":
           description: list run events
@@ -337,7 +344,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings'
         "500":
           description: get settings
           schema:
@@ -358,14 +365,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+          $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Settings'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Settings'
         "400":
           description: invalid request body
           schema:
@@ -390,7 +397,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+              $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch'
             type: array
         "500":
           description: list watches
@@ -420,7 +427,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch'
         "400":
           description: invalid request body, or a validation error naming the bad
             field
@@ -468,7 +475,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch'
         "404":
           description: watch not found
           schema:
@@ -501,7 +508,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.Watch'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch'
         "400":
           description: invalid request body, or a validation error naming the bad
             field
@@ -541,7 +548,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_sampariat_prices-reminder_internal_httpapi_presenter_v1.History'
+            $ref: '#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.History'
         "500":
           description: list price samples
           schema:
@@ -555,7 +562,7 @@ paths:
     post:
       description: Runs the pipeline immediately, outside the normal schedule, bypassing
         the provider cache so it always fetches fresh (see providers.SkipCache). Honours
-        the global dry-run setting for whether the result actually gets sent to Telegram,
+        the global dry-run setting for whether the result actually gets sent to Discord,
         matching the scheduled path's own behavior.
       parameters:
       - description: Watch ID

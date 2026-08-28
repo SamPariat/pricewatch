@@ -47,7 +47,7 @@ func New(repo domain.Repository, p *pipeline.Pipeline, notifier domain.Notifier)
 
 // Reload rebuilds every cron entry from the currently enabled watches,
 // grouping watches that share an exact (timezone, cron_expr) so they fire
-// — and send — together as one digest message (PLAN.md § Telegram: "one
+// — and send — together as one digest message (PLAN.md § Discord: "one
 // digest message for all watches, not one per watch"). Call it after any
 // watch create/update/delete/enable/disable so cron reflects the database
 // without a process restart.
@@ -190,7 +190,7 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 		loc = i18n.Locale(settings.Language)
 	}
 
-	var sections []string
+	var embeds []domain.Embed
 	var ranWatches []domain.Watch
 	var breached []domain.Watch
 	for _, w := range ws {
@@ -206,29 +206,29 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 			logging.From(rctx).Error().Err(err).Msg("scheduler: run failed")
 			continue
 		}
-		sections = append(sections, res.Text)
+		embeds = append(embeds, res.Embed)
 		ranWatches = append(ranWatches, w)
 		if res.ThresholdBreach {
 			breached = append(breached, w)
 		}
 	}
-	if len(sections) == 0 {
+	if len(embeds) == 0 {
 		return
 	}
 
 	if settings.DryRun {
-		logging.From(ctx).Info().Int("sections", len(sections)).Msg("scheduler: dry-run, digest not sent")
+		logging.From(ctx).Info().Int("embeds", len(embeds)).Msg("scheduler: dry-run, digest not sent")
 		return
 	}
-	if settings.TelegramChatID == "" {
-		logging.From(ctx).Warn().Msg("scheduler: no telegram chat configured, digest not sent")
+	if settings.DiscordChannelID == "" {
+		logging.From(ctx).Warn().Msg("scheduler: no discord channel configured, digest not sent")
 		return
 	}
 
 	// Threshold alerts fire on top of the daily digest, not instead of
 	// it (PLAN.md § Further suggestions) — each breached watch gets its
 	// own immediate ping, in addition to still appearing in the combined
-	// digest below. The section text is deliberately reused rather than
+	// digest below. The embed is deliberately reused rather than
 	// re-rendered so the alert and the digest entry can never disagree.
 	for _, w := range breached {
 		i := indexOf(ranWatches, w.ID)
@@ -236,22 +236,23 @@ func (s *Scheduler) fireGroup(ctx context.Context, ws []domain.Watch) {
 			continue
 		}
 		alert := domain.Message{
-			Text:    "<b>" + i18n.T(loc, "alert.threshold_header") + "</b>\n\n" + sections[i],
+			Content: i18n.T(loc, "alert.threshold_header"),
+			Embeds:  []domain.Embed{embeds[i]},
 			Buttons: snoozeButtons(w.ID),
 		}
-		if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, alert); err != nil {
+		if err := s.notifier.Send(ctx, domain.Target{ChannelID: settings.DiscordChannelID}, alert); err != nil {
 			logging.From(ctx).Error().Err(err).Str("watch_id", string(w.ID)).Msg("scheduler: threshold alert send failed")
 		}
 	}
 
-	msg := domain.Message{Text: render.CombineDigest(sections, loc)}
+	msg := render.CombineDigest(embeds, loc)
 	// Buttons only make sense when the message is unambiguously about one
 	// watch — a batch of several watches has no single "this one" for
-	// Snooze/Pause/Refresh to act on. See PLAN.md § Telegram.
+	// Snooze/Pause/Refresh to act on. See PLAN.md § Discord.
 	if len(ranWatches) == 1 {
 		msg.Buttons = snoozeButtons(ranWatches[0].ID)
 	}
-	if err := s.notifier.Send(ctx, domain.Target{ChatID: settings.TelegramChatID}, msg); err != nil {
+	if err := s.notifier.Send(ctx, domain.Target{ChannelID: settings.DiscordChannelID}, msg); err != nil {
 		logging.From(ctx).Error().Err(err).Msg("scheduler: send failed")
 	}
 }
@@ -266,8 +267,8 @@ func indexOf(ws []domain.Watch, id domain.WatchID) int {
 }
 
 // isSnoozed reports whether now falls within a watch's active snooze
-// window — see WatchState.SnoozedUntil and telegram.UpdatesListener,
-// which is what actually sets it from the "Snooze 7d" button press.
+// window — see WatchState.SnoozedUntil and discordbot.Listener, which is
+// what actually sets it from the "Snooze 7d" button press.
 func isSnoozed(state domain.WatchState, now time.Time) bool {
 	return state.SnoozedUntil != nil && now.Before(*state.SnoozedUntil)
 }

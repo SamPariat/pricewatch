@@ -67,7 +67,7 @@ func (s *Session) sign(payload []byte) []byte {
 }
 
 // RequireAuth rejects any request without a valid session cookie. The
-// panel is internet-facing and guards a live Telegram bot token and every
+// panel is internet-facing and guards a live Discord bot token and every
 // watch's configuration, so every /api route except /auth/login and the
 // version/health checks sits behind this.
 func RequireAuth(sess *Session) fiber.Handler {

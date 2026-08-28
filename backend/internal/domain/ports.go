@@ -6,10 +6,9 @@ import (
 )
 
 // Provider fetches Quotes for one AssetKind from one upstream source
-// (Aviasales, Hotellook, ...). Adapters live in internal/providers;
-// resilience (retry, breaker, cache, rate limit, singleflight) is layered
-// on as decorators that also satisfy this interface — see PLAN.md
-// § Architecture patterns.
+// (Aviasales). Adapters live in internal/providers; resilience (retry,
+// breaker, cache, rate limit, singleflight) is layered on as decorators
+// that also satisfy this interface — see PLAN.md § Architecture patterns.
 type Provider interface {
 	Kind() AssetKind
 	Fetch(ctx context.Context, w Watch) ([]Quote, error)
@@ -22,7 +21,7 @@ const (
 	NotifierDisconnected NotifierStatus = "disconnected"
 )
 
-// Notifier delivers a rendered digest. The telegram adapter is the only
+// Notifier delivers a rendered digest. The discord adapter is the only
 // real implementation; noop backs dry-run mode as a Null Object rather
 // than an if-branch scattered through the pipeline.
 type Notifier interface {

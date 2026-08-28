@@ -310,7 +310,7 @@ func (p *Postgres) UpsertWatchState(ctx context.Context, s domain.WatchState) er
 }
 
 // SetSnooze writes only the snoozed_until column — deliberately separate
-// from UpsertWatchState so the Telegram "Snooze 7d" button and the
+// from UpsertWatchState so the Discord "Snooze 7d" button and the
 // pipeline's own run-health writes can never race or clobber each other.
 func (p *Postgres) SetSnooze(ctx context.Context, watchID domain.WatchID, until *time.Time) error {
 	_, err := p.pool.Exec(ctx, `
@@ -329,10 +329,10 @@ func (p *Postgres) SetSnooze(ctx context.Context, watchID domain.WatchID, until 
 
 func (p *Postgres) GetSettings(ctx context.Context) (domain.Settings, error) {
 	row := p.pool.QueryRow(ctx, `
-		SELECT telegram_chat_id, quiet_hours_start, quiet_hours_end, currency, dry_run, language
+		SELECT discord_channel_id, quiet_hours_start, quiet_hours_end, currency, dry_run, language
 		FROM settings WHERE id = true`)
 	var s domain.Settings
-	if err := row.Scan(&s.TelegramChatID, &s.QuietHoursStart, &s.QuietHoursEnd, &s.Currency, &s.DryRun, &s.Language); err != nil {
+	if err := row.Scan(&s.DiscordChannelID, &s.QuietHoursStart, &s.QuietHoursEnd, &s.Currency, &s.DryRun, &s.Language); err != nil {
 		return domain.Settings{}, fmt.Errorf("store: get settings: %w", err)
 	}
 	return s, nil
@@ -340,9 +340,9 @@ func (p *Postgres) GetSettings(ctx context.Context) (domain.Settings, error) {
 
 func (p *Postgres) UpdateSettings(ctx context.Context, s domain.Settings) error {
 	_, err := p.pool.Exec(ctx, `
-		UPDATE settings SET telegram_chat_id=$1, quiet_hours_start=$2, quiet_hours_end=$3, currency=$4, dry_run=$5, language=$6
+		UPDATE settings SET discord_channel_id=$1, quiet_hours_start=$2, quiet_hours_end=$3, currency=$4, dry_run=$5, language=$6
 		WHERE id = true`,
-		s.TelegramChatID, s.QuietHoursStart, s.QuietHoursEnd, s.Currency, s.DryRun, s.Language,
+		s.DiscordChannelID, s.QuietHoursStart, s.QuietHoursEnd, s.Currency, s.DryRun, s.Language,
 	)
 	if err != nil {
 		return fmt.Errorf("store: update settings: %w", err)

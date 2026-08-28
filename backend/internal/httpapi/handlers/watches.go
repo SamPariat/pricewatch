@@ -166,7 +166,7 @@ type runNowResponse struct {
 
 // RunWatchNow godoc
 // @Summary      Run a watch now
-// @Description  Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Telegram, matching the scheduled path's own behavior.
+// @Description  Runs the pipeline immediately, outside the normal schedule, bypassing the provider cache so it always fetches fresh (see providers.SkipCache). Honours the global dry-run setting for whether the result actually gets sent to Discord, matching the scheduled path's own behavior.
 // @Tags         watches
 // @Security     CookieAuth
 // @Produce      json

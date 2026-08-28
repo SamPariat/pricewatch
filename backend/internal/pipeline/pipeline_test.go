@@ -62,8 +62,8 @@ func TestRunWatch_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunWatch: %v", err)
 	}
-	if res.Text == "" {
-		t.Fatal("expected non-empty rendered text")
+	if res.Embed.Title == "" {
+		t.Fatal("expected a non-empty embed title")
 	}
 	if res.ThresholdBreach {
 		t.Error("expected no threshold breach — watch has no ThresholdPct configured")
@@ -156,7 +156,7 @@ func TestRunWatch_ConsecutiveFailuresAccumulate(t *testing.T) {
 }
 
 // TestRunWatch_PreservesSnooze guards against UpsertWatchState silently
-// clearing an active Telegram snooze on a normal run — see
+// clearing an active Discord snooze on a normal run — see
 // storetest.FakeRepository.UpsertWatchState's doc comment. A regression
 // here would mean "Snooze 7d" stops working the moment the very next
 // scheduled fetch completes.
@@ -242,11 +242,11 @@ func TestRunWatch_NearestMatch_Succeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected the nearest-available fallback to succeed, got: %v", err)
 	}
-	if !strings.Contains(res.Text, "No exact match") {
-		t.Errorf("expected the digest to note the fallback match, got: %q", res.Text)
+	if !strings.Contains(res.Embed.Footer, "No exact match") {
+		t.Errorf("expected the embed footer to note the fallback match, got: %q", res.Embed.Footer)
 	}
-	if !strings.Contains(res.Text, "Dec 25") || !strings.Contains(res.Text, "Dec 31") {
-		t.Errorf("expected the digest to show the actual matched dates, got: %q", res.Text)
+	if !strings.Contains(res.Embed.Footer, "Dec 25") || !strings.Contains(res.Embed.Footer, "Dec 31") {
+		t.Errorf("expected the footer to show the actual matched dates, got: %q", res.Embed.Footer)
 	}
 }
 
@@ -373,18 +373,6 @@ func TestTargetDates_OneWay_EmptyReturn(t *testing.T) {
 	}
 	if ret != "" {
 		t.Errorf("expected empty return date for a one-way watch, got %q", ret)
-	}
-}
-
-func TestTargetDates_Hotel(t *testing.T) {
-	params, _ := json.Marshal(domain.HotelParams{Location: "Goa", CheckIn: "2026-12-10", CheckOut: "2026-12-15"})
-	w := domain.Watch{Kind: domain.AssetHotel, Params: params}
-	depart, ret, err := targetDates(w)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if depart != "2026-12-10" || ret != "2026-12-15" {
-		t.Errorf("targetDates = %q, %q, want check-in/out dates", depart, ret)
 	}
 }
 

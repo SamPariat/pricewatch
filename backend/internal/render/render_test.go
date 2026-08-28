@@ -21,15 +21,27 @@ func flightWatch(t *testing.T) domain.Watch {
 	return domain.Watch{ID: "w1", Kind: domain.AssetFlightReturn, Params: params}
 }
 
+// field returns the value of the named field, or "" if not present —
+// keeps assertions below reading like "what does the Change field say"
+// rather than re-implementing a linear search in every test.
+func field(e domain.Embed, name string) (string, bool) {
+	for _, f := range e.Fields {
+		if f.Name == name {
+			return f.Value, true
+		}
+	}
+	return "", false
+}
+
 func TestDigest_IncludesPriceAndTitle(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
 
-	if !strings.Contains(text, "BLR → GOI") {
-		t.Errorf("missing route in title: %q", text)
+	if e.Title != "BLR → GOI · return" {
+		t.Errorf("Title = %q, want the derived route title", e.Title)
 	}
-	if !strings.Contains(text, "INR 8,412") {
-		t.Errorf("missing formatted price: %q", text)
+	if !strings.Contains(e.Description, "INR 8,412") {
+		t.Errorf("missing formatted price in Description: %q", e.Description)
 	}
 }
 
@@ -40,9 +52,10 @@ func TestDigest_IncludesPriceAndTitle(t *testing.T) {
 // keys.
 func TestDigest_ZeroValueLocale_DefaultsToEnglish(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Delta: analytics.Delta{Pct: -4.6, OK: true}})
-	if !strings.Contains(text, "down") {
-		t.Errorf("expected English 'down' with a zero-value Locale, got: %q", text)
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Delta: analytics.Delta{Pct: -4.6, OK: true}})
+	change, ok := field(e, "Change")
+	if !ok || !strings.Contains(change, "down") {
+		t.Errorf("expected English 'down' with a zero-value Locale, got Change=%q ok=%v", change, ok)
 	}
 }
 
@@ -53,64 +66,84 @@ func TestDigest_ZeroValueLocale_DefaultsToEnglish(t *testing.T) {
 // rule, which applies just as much to i18n templates as to the LLM).
 func TestDigest_Hindi_TranslatesLabelsButNotTheNumbers(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{
+	e := Digest(w, Analysis{
 		PriceMinor: 841200, Currency: "INR", Locale: i18n.HI,
 		Delta:      analytics.Delta{AbsMinor: -50000, Pct: -4.6, OK: true},
 		Percentile: 87, PercentileOK: true,
 	})
-	if !strings.Contains(text, "नीचे") {
-		t.Errorf("expected the Hindi 'down' word, got: %q", text)
+	change, _ := field(e, "बदलाव")
+	if !strings.Contains(change, "नीचे") {
+		t.Errorf("expected the Hindi 'down' word in the Change field, got: %q", change)
 	}
-	if !strings.Contains(text, "पिछले 90 दिनों के 87% से सस्ता") {
-		t.Errorf("expected the Hindi percentile line, got: %q", text)
+	percentile, _ := field(e, "90-दिन पर्सेंटाइल")
+	if percentile != "पिछले 90 दिनों के 87% से सस्ता" {
+		t.Errorf("percentile field = %q, want the Hindi percentile line", percentile)
 	}
-	if !strings.Contains(text, "INR 8,412") {
-		t.Errorf("expected the price to stay numeric/untranslated, got: %q", text)
+	if !strings.Contains(e.Description, "INR 8,412") {
+		t.Errorf("expected the price to stay numeric/untranslated, got: %q", e.Description)
 	}
-	if !strings.Contains(text, "· राउंड ट्रिप") {
-		t.Errorf("expected the Hindi round-trip suffix in the title, got: %q", text)
-	}
-}
-
-func TestDigest_DownDelta_ShowsDownArrow(t *testing.T) {
-	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Delta: analytics.Delta{AbsMinor: -50000, Pct: -4.6, OK: true}})
-
-	if !strings.Contains(text, "▼ 4.6%") {
-		t.Errorf("expected down arrow with positive magnitude, got: %q", text)
-	}
-	if !strings.Contains(text, "down") {
-		t.Errorf("expected the word 'down', got: %q", text)
+	if !strings.Contains(e.Title, "· राउंड ट्रिप") {
+		t.Errorf("expected the Hindi round-trip suffix in the title, got: %q", e.Title)
 	}
 }
 
-func TestDigest_UpDelta_ShowsUpArrow(t *testing.T) {
+func TestDigest_DownDelta_ShowsDownArrowAndGreenColor(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 900000, Currency: "INR", Delta: analytics.Delta{AbsMinor: 50000, Pct: 12.0, OK: true}})
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Delta: analytics.Delta{AbsMinor: -50000, Pct: -4.6, OK: true}})
 
-	if !strings.Contains(text, "▲ 12.0%") {
-		t.Errorf("expected up arrow, got: %q", text)
+	change, ok := field(e, "Change")
+	if !ok {
+		t.Fatal("expected a Change field")
 	}
-	if !strings.Contains(text, "up") {
-		t.Errorf("expected the word 'up', got: %q", text)
+	if !strings.Contains(change, "▼ 4.6%") {
+		t.Errorf("expected down arrow with positive magnitude, got: %q", change)
+	}
+	if !strings.Contains(change, "down") {
+		t.Errorf("expected the word 'down', got: %q", change)
+	}
+	if e.Color != colorDown {
+		t.Errorf("Color = %#x, want colorDown (%#x) for a price drop", e.Color, colorDown)
 	}
 }
 
-func TestDigest_NoDelta_OmitsDeltaLine(t *testing.T) {
+func TestDigest_UpDelta_ShowsUpArrowAndRedColor(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"}) // Delta.OK is false (zero value)
+	e := Digest(w, Analysis{PriceMinor: 900000, Currency: "INR", Delta: analytics.Delta{AbsMinor: 50000, Pct: 12.0, OK: true}})
 
-	if strings.Contains(text, "vs yesterday") {
-		t.Errorf("expected no delta text when Delta.OK is false, got: %q", text)
+	change, ok := field(e, "Change")
+	if !ok {
+		t.Fatal("expected a Change field")
+	}
+	if !strings.Contains(change, "▲ 12.0%") {
+		t.Errorf("expected up arrow, got: %q", change)
+	}
+	if !strings.Contains(change, "up") {
+		t.Errorf("expected the word 'up', got: %q", change)
+	}
+	if e.Color != colorUp {
+		t.Errorf("Color = %#x, want colorUp (%#x) for a price rise", e.Color, colorUp)
+	}
+}
+
+func TestDigest_NoDelta_OmitsChangeFieldAndUsesNeutralColor(t *testing.T) {
+	w := flightWatch(t)
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"}) // Delta.OK is false (zero value)
+
+	if _, ok := field(e, "Change"); ok {
+		t.Errorf("expected no Change field when Delta.OK is false, got fields: %+v", e.Fields)
+	}
+	if e.Color != colorNeutral {
+		t.Errorf("Color = %#x, want colorNeutral (%#x) with no delta", e.Color, colorNeutral)
 	}
 }
 
 func TestDigest_Percentile_Renders(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Percentile: 87, PercentileOK: true})
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR", Percentile: 87, PercentileOK: true})
 
-	if !strings.Contains(text, "Cheaper than 87% of the last 90 days") {
-		t.Errorf("missing percentile line: %q", text)
+	got, ok := field(e, "90-day percentile")
+	if !ok || got != "Cheaper than 87% of the last 90 days" {
+		t.Errorf("percentile field = %q, ok=%v, want the full sentence", got, ok)
 	}
 }
 
@@ -121,119 +154,94 @@ func TestDigest_AllTimeLow_OnlyRendersWhenBelowCurrentPrice(t *testing.T) {
 		PriceMinor: 900000, Currency: "INR",
 		AllTimeLow: analytics.AllTimeLow{PriceMinor: 794000, Date: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC), OK: true},
 	})
-	if !strings.Contains(below, "All-time low") {
-		t.Errorf("expected all-time-low line when current price is above it: %q", below)
+	if _, ok := field(below, "All-time low"); !ok {
+		t.Errorf("expected an All-time low field when current price is above it, got fields: %+v", below.Fields)
 	}
 
-	// Current price IS the all-time low — the line would be redundant
+	// Current price IS the all-time low — the field would be redundant
 	// with the headline price, so it must not render.
 	atLow := Digest(w, Analysis{
 		PriceMinor: 794000, Currency: "INR",
 		AllTimeLow: analytics.AllTimeLow{PriceMinor: 794000, Date: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC), OK: true},
 	})
-	if strings.Contains(atLow, "All-time low") {
-		t.Errorf("did not expect an all-time-low line when current price already is the low: %q", atLow)
+	if _, ok := field(atLow, "All-time low"); ok {
+		t.Errorf("did not expect an All-time low field when current price already is the low, got fields: %+v", atLow.Fields)
 	}
 }
 
-func TestDigest_NearestMatch_NotesTheShiftedDates(t *testing.T) {
+func TestDigest_NearestMatch_NotesTheShiftedDatesInFooter(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{
+	e := Digest(w, Analysis{
 		PriceMinor: 841200, Currency: "INR",
 		NearestMatch: DateRange{Depart: "2026-12-24", Return: "2026-12-26"},
 	})
 
-	if !strings.Contains(text, "No exact match") {
-		t.Errorf("expected a note about the fallback match, got: %q", text)
+	if !strings.Contains(e.Footer, "No exact match") {
+		t.Errorf("expected a footer note about the fallback match, got: %q", e.Footer)
 	}
-	if !strings.Contains(text, "Dec 24") || !strings.Contains(text, "Dec 26") {
-		t.Errorf("expected the actual matched dates in the note, got: %q", text)
+	if !strings.Contains(e.Footer, "Dec 24") || !strings.Contains(e.Footer, "Dec 26") {
+		t.Errorf("expected the actual matched dates in the footer, got: %q", e.Footer)
 	}
 }
 
-func TestDigest_ExactMatch_OmitsNearestMatchNote(t *testing.T) {
+func TestDigest_ExactMatch_OmitsFooter(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
 
-	if strings.Contains(text, "No exact match") {
-		t.Errorf("did not expect a nearest-match note for the zero value, got: %q", text)
+	if e.Footer != "" {
+		t.Errorf("did not expect a footer for the zero-value NearestMatch, got: %q", e.Footer)
 	}
 }
 
 func TestDigest_NearestMatch_OneWay_OmitsArrow(t *testing.T) {
 	w := flightWatch(t)
-	text := Digest(w, Analysis{
+	e := Digest(w, Analysis{
 		PriceMinor: 841200, Currency: "INR",
 		NearestMatch: DateRange{Depart: "2026-12-24"}, // no Return — one-way
 	})
 
-	var noteLine string
-	for _, line := range strings.Split(text, "\n") {
-		if strings.Contains(line, "No exact match") {
-			noteLine = line
-		}
+	if !strings.Contains(e.Footer, "Dec 24") {
+		t.Errorf("footer = %q, want the matched depart date", e.Footer)
 	}
-	if noteLine == "" {
-		t.Fatalf("expected a nearest-match note line, got: %q", text)
-	}
-	if !strings.Contains(noteLine, "Dec 24") {
-		t.Errorf("note line = %q, want the matched depart date", noteLine)
-	}
-	if strings.Contains(noteLine, "→") {
-		t.Errorf("note line = %q, did not expect an arrow with no return date", noteLine)
-	}
-}
-
-func TestDigest_HotelUsesLocationTitle(t *testing.T) {
-	params, err := json.Marshal(domain.HotelParams{Location: "Goa", CheckIn: "2026-12-10", CheckOut: "2026-12-15"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := domain.Watch{ID: "w2", Kind: domain.AssetHotel, Params: params}
-	text := Digest(w, Analysis{PriceMinor: 920000, Currency: "INR"})
-
-	if !strings.Contains(text, "Goa") {
-		t.Errorf("expected hotel watch title to use location: %q", text)
+	if strings.Contains(e.Footer, "→") {
+		t.Errorf("footer = %q, did not expect an arrow with no return date", e.Footer)
 	}
 }
 
 func TestDigest_NamedWatchUsesNameOverDerivedTitle(t *testing.T) {
 	w := flightWatch(t)
 	w.Name = "Christmas trip"
-	text := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
+	e := Digest(w, Analysis{PriceMinor: 841200, Currency: "INR"})
 
-	if !strings.Contains(text, "Christmas trip") {
-		t.Errorf("expected watch.Name to take priority, got: %q", text)
-	}
-	if strings.Contains(text, "BLR → GOI") {
-		t.Errorf("did not expect derived route title when Name is set: %q", text)
+	if e.Title != "Christmas trip" {
+		t.Errorf("Title = %q, want watch.Name to take priority", e.Title)
 	}
 }
 
 func TestCombineDigest_Pluralizes(t *testing.T) {
-	one := CombineDigest([]string{"section a"}, i18n.EN)
-	if !strings.Contains(one, "1 watch") || strings.Contains(one, "1 watches") {
-		t.Errorf("expected singular 'watch', got: %q", one)
+	one := CombineDigest([]domain.Embed{{Title: "section a"}}, i18n.EN)
+	if !strings.Contains(one.Content, "1 watch") || strings.Contains(one.Content, "1 watches") {
+		t.Errorf("expected singular 'watch', got: %q", one.Content)
 	}
 
-	two := CombineDigest([]string{"section a", "section b"}, i18n.EN)
-	if !strings.Contains(two, "2 watches") {
-		t.Errorf("expected plural 'watches', got: %q", two)
+	two := CombineDigest([]domain.Embed{{Title: "section a"}, {Title: "section b"}}, i18n.EN)
+	if !strings.Contains(two.Content, "2 watches") {
+		t.Errorf("expected plural 'watches', got: %q", two.Content)
 	}
-	if !strings.Contains(two, "section a") || !strings.Contains(two, "section b") {
-		t.Errorf("expected both sections present, got: %q", two)
+	if len(two.Embeds) != 2 {
+		t.Errorf("expected both embeds present, got %d", len(two.Embeds))
 	}
 }
 
 // TestCombineDigest_Hindi_NoPluralSuffix guards against reintroducing an
 // English-only "es" suffix hack — Hindi doesn't inflect the noun for
 // count the way English does, so digest.header_plural and
-// digest.header_singular are deliberately identical strings in the HI
-// catalog (see internal/i18n/messages.go).
+// digest.header_singular are deliberately identical strings in the
+// shared locales/hi.json catalog.
 func TestCombineDigest_Hindi_NoPluralSuffix(t *testing.T) {
-	two := CombineDigest([]string{"section a", "section b"}, i18n.HI)
-	if !strings.Contains(two, "2 वॉच") {
-		t.Errorf("expected the Hindi header with count 2, got: %q", two)
+	two := CombineDigest([]domain.Embed{{Title: "a"}, {Title: "b"}}, i18n.HI)
+	if !strings.Contains(two.Content, "2 वॉच") {
+		t.Errorf("expected the Hindi header with count 2, got: %q", two.Content)
 	}
 }
 

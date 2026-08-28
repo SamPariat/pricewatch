@@ -35,20 +35,6 @@ func TestCreateWatch_Return_MissingReturnDate_Returns400(t *testing.T) {
 	}
 }
 
-func TestCreateWatch_Hotel(t *testing.T) {
-	env := newTestEnv(t)
-	cookie := env.login(t)
-
-	body := map[string]any{
-		"name": "hotel test", "kind": "hotel", "cron_expr": "0 7 * * *", "timezone": "UTC",
-		"params": map[string]any{"location": "Goa", "check_in": "2026-12-10", "check_out": "2026-12-15"},
-	}
-	resp := env.do(t, http.MethodPost, apiPrefix+"/watches", body, cookie)
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("status = %d, want 201", resp.StatusCode)
-	}
-}
-
 func TestSettings_GetAndUpdate(t *testing.T) {
 	env := newTestEnv(t)
 	cookie := env.login(t)
@@ -60,7 +46,7 @@ func TestSettings_GetAndUpdate(t *testing.T) {
 	}
 
 	s.DryRun = true
-	s.TelegramChatID = "-100123456"
+	s.DiscordChannelID = "-100123456"
 	updateResp := env.do(t, http.MethodPatch, apiPrefix+"/settings", s, cookie)
 	if updateResp.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d", updateResp.StatusCode)
@@ -68,7 +54,7 @@ func TestSettings_GetAndUpdate(t *testing.T) {
 
 	getResp2 := env.do(t, http.MethodGet, apiPrefix+"/settings", nil, cookie)
 	s2 := decodeData[v1.Settings](t, getResp2)
-	if !s2.DryRun || s2.TelegramChatID != "-100123456" {
+	if !s2.DryRun || s2.DiscordChannelID != "-100123456" {
 		t.Errorf("settings did not persist: %+v", s2)
 	}
 }

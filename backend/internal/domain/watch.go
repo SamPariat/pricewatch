@@ -29,13 +29,6 @@ type FlightParams struct {
 	ReturnDate  *string `json:"return_date,omitempty"`
 }
 
-// HotelParams backs AssetHotel and AssetRental watches.
-type HotelParams struct {
-	Location string `json:"location"`
-	CheckIn  string `json:"check_in"`
-	CheckOut string `json:"check_out"`
-}
-
 // DecodeFlightParams decodes w.Params for a flight watch. Callers should
 // switch on w.Kind before calling; this returns an error rather than
 // panicking if that check was skipped.
@@ -46,18 +39,6 @@ func (w Watch) DecodeFlightParams() (FlightParams, error) {
 	var p FlightParams
 	if err := json.Unmarshal(w.Params, &p); err != nil {
 		return FlightParams{}, fmt.Errorf("watch %s: decode flight params: %w", w.ID, err)
-	}
-	return p, nil
-}
-
-// DecodeHotelParams decodes w.Params for a hotel or rental watch.
-func (w Watch) DecodeHotelParams() (HotelParams, error) {
-	if w.Kind != AssetHotel && w.Kind != AssetRental {
-		return HotelParams{}, fmt.Errorf("watch %s: kind %q is not a hotel/rental kind", w.ID, w.Kind)
-	}
-	var p HotelParams
-	if err := json.Unmarshal(w.Params, &p); err != nil {
-		return HotelParams{}, fmt.Errorf("watch %s: decode hotel params: %w", w.ID, err)
 	}
 	return p, nil
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isFlightParams, type AssetKind, type Watch } from "@/lib/types";
+import type { AssetKind, Watch } from "@/lib/types";
 import { createWatchAction, updateWatchAction, type FormState } from "@/app/(app)/watches/actions";
 import { useTranslations } from "next-intl";
 
@@ -14,16 +14,10 @@ export function WatchForm({ watch }: { watch?: Watch }) {
   const kindLabel: Record<AssetKind, string> = {
     flight_one_way: t("kindOneWay"),
     flight_return: t("kindReturn"),
-    hotel: t("kindHotel"),
-    rental: t("kindRental"),
   };
 
   const [kind, setKind] = useState<AssetKind>(watch?.kind ?? "flight_return");
-  const isFlight = kind === "flight_one_way" || kind === "flight_return";
   const isReturn = kind === "flight_return";
-
-  const flightParams = watch && isFlightParams(watch.params) ? watch.params : undefined;
-  const hotelParams = watch && !isFlightParams(watch.params) ? watch.params : undefined;
 
   const [hour, minute] = watch ? cronToTime(watch.cron_expr) : ["7", "0"];
 
@@ -36,7 +30,7 @@ export function WatchForm({ watch }: { watch?: Watch }) {
       <div className="flex flex-col gap-2">
         <Label>{t("typeLabel")}</Label>
         <Tabs value={kind} onValueChange={(v) => setKind(v as AssetKind)}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             {(Object.keys(kindLabel) as AssetKind[]).map((k) => (
               <TabsTrigger key={k} value={k}>
                 {kindLabel[k]}
@@ -47,36 +41,22 @@ export function WatchForm({ watch }: { watch?: Watch }) {
         <input type="hidden" name="kind" value={kind} />
       </div>
 
-      {isFlight ? (
-        <div className="grid grid-cols-2 gap-4">
-          <Field label={t("originLabel")}>
-            <Input name="origin" defaultValue={flightParams?.origin} placeholder="BLR" required maxLength={3} className="uppercase" />
+      <div className="grid grid-cols-2 gap-4">
+        <Field label={t("originLabel")}>
+          <Input name="origin" defaultValue={watch?.params.origin} placeholder="BLR" required maxLength={3} className="uppercase" />
+        </Field>
+        <Field label={t("destinationLabel")}>
+          <Input name="destination" defaultValue={watch?.params.destination} placeholder="GOI" required maxLength={3} className="uppercase" />
+        </Field>
+        <Field label={t("departDateLabel")}>
+          <Input type="date" name="depart_date" defaultValue={watch?.params.depart_date} required />
+        </Field>
+        {isReturn && (
+          <Field label={t("returnDateLabel")}>
+            <Input type="date" name="return_date" defaultValue={watch?.params.return_date} required={isReturn} />
           </Field>
-          <Field label={t("destinationLabel")}>
-            <Input name="destination" defaultValue={flightParams?.destination} placeholder="GOI" required maxLength={3} className="uppercase" />
-          </Field>
-          <Field label={t("departDateLabel")}>
-            <Input type="date" name="depart_date" defaultValue={flightParams?.depart_date} required />
-          </Field>
-          {isReturn && (
-            <Field label={t("returnDateLabel")}>
-              <Input type="date" name="return_date" defaultValue={flightParams?.return_date} required={isReturn} />
-            </Field>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <Field label={t("locationLabel")} className="col-span-2">
-            <Input name="location" defaultValue={hotelParams?.location} placeholder="Goa" required />
-          </Field>
-          <Field label={t("checkInLabel")}>
-            <Input type="date" name="check_in" defaultValue={hotelParams?.check_in} required />
-          </Field>
-          <Field label={t("checkOutLabel")}>
-            <Input type="date" name="check_out" defaultValue={hotelParams?.check_out} required />
-          </Field>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Field label={t("hourLabel")}>
