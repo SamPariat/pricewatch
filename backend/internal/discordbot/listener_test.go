@@ -15,13 +15,18 @@ import (
 	"github.com/SamPariat/pricewatch/internal/store/storetest"
 )
 
-func flightWatch(t *testing.T, id string) domain.Watch {
+// flightWatch builds a flight leg belonging to a trip seeded with the
+// same id + "-trip" suffix — callers pass repo so the trip can be seeded
+// alongside the leg, since a watch is never schedulable without one.
+func flightWatch(t *testing.T, repo *storetest.FakeRepository, id string) domain.Watch {
 	t.Helper()
 	params, err := json.Marshal(domain.FlightParams{Origin: "BLR", Destination: "GOI", DepartDate: "2026-12-10"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return domain.Watch{ID: domain.WatchID(id), Kind: domain.AssetFlightOneWay, Enabled: true, CronExpr: "0 7 * * *", Timezone: "UTC", Params: params}
+	tripID := domain.TripID(id + "-trip")
+	repo.SeedTrip(domain.Trip{ID: tripID, Name: id, CronExpr: "0 7 * * *", Timezone: "UTC", Enabled: true})
+	return domain.Watch{ID: domain.WatchID(id), TripID: tripID, Kind: domain.AssetFlightOneWay, Enabled: true, Params: params}
 }
 
 type fixedClock struct{ t time.Time }
@@ -73,7 +78,7 @@ func TestParseCallback(t *testing.T) {
 
 func TestSnooze_SetsSnoozedUntil(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "w1")
+	w := flightWatch(t, repo, "w1")
 	repo.SeedWatch(w)
 	l := newTestListener(t, repo)
 
@@ -97,7 +102,7 @@ func TestSnooze_SetsSnoozedUntil(t *testing.T) {
 
 func TestPause_DisablesWatchAndReloadsScheduler(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "w2")
+	w := flightWatch(t, repo, "w2")
 	repo.SeedWatch(w)
 	l := newTestListener(t, repo)
 
@@ -134,7 +139,7 @@ func TestPause_UnknownWatch_ReturnsMessageWithoutPanicking(t *testing.T) {
 
 func TestRefresh_DryRun_RunsPipelineButDoesNotSend(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "w3")
+	w := flightWatch(t, repo, "w3")
 	repo.SeedWatch(w)
 	if err := repo.UpdateSettings(context.Background(), domain.Settings{DryRun: true, DiscordChannelID: "chan1", Currency: "INR"}); err != nil {
 		t.Fatal(err)
@@ -167,7 +172,7 @@ func TestRefresh_UnknownWatch_ReturnsMessage(t *testing.T) {
 
 func TestSnoozePauseRefresh_Hindi_ReturnDistinctText(t *testing.T) {
 	repo := storetest.New()
-	w := flightWatch(t, "w4")
+	w := flightWatch(t, repo, "w4")
 	repo.SeedWatch(w)
 	l := newTestListener(t, repo)
 

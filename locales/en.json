@@ -20,6 +20,22 @@
       "history_failed": "list price samples",
       "history": "history"
     },
+    "trips": {
+      "list_failed": "list trips",
+      "listed": "trips listed",
+      "not_found": "trip not found",
+      "found": "trip found",
+      "create_failed": "create trip",
+      "created": "trip created",
+      "update_failed": "update trip",
+      "updated": "trip updated"
+    },
+    "requests": {
+      "list_failed": "list requests",
+      "listed": "requests listed",
+      "not_found": "request not found",
+      "approve_failed": "approve request"
+    },
     "settings": {
       "get_failed": "get settings",
       "get_ok": "settings",
@@ -52,11 +68,19 @@
       "invalid_timezone": "invalid timezone: {Error}",
       "invalid_params": "invalid params for kind \"{Kind}\": {Error}",
       "missing_flight_fields": "invalid params for kind \"{Kind}\": origin, destination, and depart_date are required",
-      "missing_return_date": "invalid params for kind \"{Kind}\": return_date is required"
+      "missing_return_date": "invalid params for kind \"{Kind}\": return_date is required",
+      "missing_lodging_fields": "invalid params for kind \"{Kind}\": url, check_in, and check_out are required",
+      "invalid_lodging_url": "invalid params for kind \"{Kind}\": url must be an Airbnb listing (airbnb.com/rooms/...)",
+      "missing_trip": "trip_id is required — every watch belongs to a trip",
+      "trip_not_found": "trip \"{TripID}\" not found",
+      "invalid_trip_cron": "invalid cron_expr: {Error}",
+      "invalid_trip_timezone": "invalid timezone: {Error}"
     },
     "digest": {
       "header_singular": "Daily digest — {Count} watch",
       "header_plural": "Daily digest — {Count} watches",
+      "header_trip": "{Name} — {Count} update(s)",
+      "lodging_generic": "Airbnb stay",
       "up": "up",
       "down": "down",
       "delta": "{Arrow} {Pct}% ({Word} vs yesterday)",
@@ -79,11 +103,19 @@
       "pause_failed": "Failed to pause — try again from the panel.",
       "paused": "Paused. Re-enable it from the panel when you're ready.",
       "refresh_failed": "Refresh failed — check the run log in the panel.",
-      "refreshed": "Refreshed."
+      "refreshed": "Refreshed.",
+      "trip_submitted": "Submitted — approve it from the Requests page in the panel.",
+      "track_submitted": "Submitted — approve it from the Requests page in the panel.",
+      "track_remove_submitted": "Submitted — approve it from the Requests page in the panel.",
+      "track_list_empty": "No tracked Airbnb links yet.",
+      "trip_list_empty": "No trips yet — create one with /trip create.",
+      "trip_not_found": "No trip with that name — check /trip list, or create it first with /trip create.",
+      "request_failed": "Something went wrong — try again, or check the panel."
     }
   },
   "nav": {
-    "watches": "Watches",
+    "trips": "Trips",
+    "requests": "Requests",
     "runs": "Runs",
     "settings": "Settings",
     "signOut": "Sign out"
@@ -130,6 +162,17 @@
     "statusOk": "OK",
     "updatedPrefix": "Updated"
   },
+  "trips": {
+    "title": "Trips",
+    "count": "trips",
+    "newTrip": "New trip",
+    "emptyText": "No trips yet — create one to start tracking flights or stays.",
+    "legCount": "legs",
+    "paused": "paused",
+    "addLeg": "Add leg",
+    "noLegsYet": "No legs yet — add a flight or an Airbnb link.",
+    "scheduleLabel": "Daily at {Time} ({Tz})"
+  },
   "watchDetail": {
     "edit": "Edit",
     "updatedPrefix": "Updated",
@@ -147,13 +190,15 @@
     "typeLabel": "Type",
     "kindOneWay": "One-way",
     "kindReturn": "Return",
+    "kindAirbnb": "Airbnb",
     "originLabel": "Origin (IATA)",
     "destinationLabel": "Destination (IATA)",
     "departDateLabel": "Depart date",
     "returnDateLabel": "Return date",
-    "hourLabel": "Check time (hour)",
-    "minuteLabel": "Check time (minute)",
-    "timezoneLabel": "Timezone",
+    "urlLabel": "Airbnb listing URL",
+    "checkInLabel": "Check-in",
+    "checkOutLabel": "Check-out",
+    "guestsLabel": "Guests (optional)",
     "thresholdLabel": "Alert threshold (% drop)",
     "nameLabel": "Name (optional)",
     "namePlaceholder": "Goa return in December",
@@ -162,11 +207,47 @@
     "saveWatch": "Save watch"
   },
   "newWatch": {
-    "title": "New watch",
-    "subtitle": "Track a flight's price over time."
+    "title": "New leg",
+    "subtitle": "Add a flight or Airbnb stay to \"{Name}\"."
   },
   "editWatch": {
-    "title": "Edit watch"
+    "title": "Edit leg"
+  },
+  "tripForm": {
+    "nameLabel": "Trip name",
+    "namePlaceholder": "Goa, December",
+    "hourLabel": "Check time (hour)",
+    "minuteLabel": "Check time (minute)",
+    "timezoneLabel": "Timezone",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "saveTrip": "Save trip"
+  },
+  "newTrip": {
+    "title": "New trip",
+    "subtitle": "Name it and pick a daily check time — you'll add flights or stays next."
+  },
+  "editTrip": {
+    "title": "Edit trip"
+  },
+  "deleteTripDialog": {
+    "trigger": "Delete trip",
+    "title": "Delete trip?",
+    "description": "This permanently removes \"{Name}\" and every leg (flight or stay) in it, along with their price history. This can't be undone.",
+    "fallbackName": "this trip",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "deleting": "Deleting…"
+  },
+  "requests": {
+    "title": "Requests",
+    "subtitle": "Changes submitted from Discord, awaiting your approval.",
+    "empty": "No pending requests.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "kind_add_leg": "Add link",
+    "kind_remove_leg": "Remove link",
+    "kind_create_trip": "New trip"
   },
   "deleteDialog": {
     "trigger": "Delete",
@@ -222,6 +303,8 @@
   "errors": {
     "createWatchFailed": "Failed to create watch",
     "updateWatchFailed": "Failed to update watch",
+    "createTripFailed": "Failed to create trip",
+    "updateTripFailed": "Failed to update trip",
     "loginServerUnreachable": "Could not reach the server — try again.",
     "loginIncorrectPassword": "Incorrect password.",
     "loginSomethingWrong": "Something went wrong — try again.",

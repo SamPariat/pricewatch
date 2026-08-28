@@ -2,10 +2,9 @@
 // since this is a two-language monorepo, not generated. If a v1 DTO field
 // changes on the Go side, update it here too.
 
-// Flights only — hotel and rental kinds existed in an earlier version of
-// this app but were removed (see backend/internal/domain.AssetKind's own
-// doc comment: no free, working API was left for either).
-export type AssetKind = "flight_one_way" | "flight_return";
+// flight_* kinds use the Travelpayouts API. lodging_airbnb is scraped
+// (see backend/internal/providers/airbnb) since Airbnb has no API.
+export type AssetKind = "flight_one_way" | "flight_return" | "lodging_airbnb";
 
 export interface FlightParams {
   origin: string;
@@ -14,6 +13,15 @@ export interface FlightParams {
   return_date?: string;
 }
 
+export interface LodgingParams {
+  url: string;
+  check_in: string; // YYYY-MM-DD
+  check_out: string; // YYYY-MM-DD
+  guests?: number;
+}
+
+export type WatchParams = FlightParams | LodgingParams;
+
 export interface PriceSummary {
   price_minor: number;
   currency: string;
@@ -21,14 +29,15 @@ export interface PriceSummary {
   percentile?: number;
 }
 
+// Watch is a leg (flight or lodging) belonging to a Trip — it has no
+// schedule of its own; see Trip.
 export interface Watch {
   id: string;
+  trip_id: string;
   name: string;
   kind: AssetKind;
   enabled: boolean;
-  cron_expr: string;
-  timezone: string;
-  params: FlightParams;
+  params: WatchParams;
   threshold_pct: number;
   created_at: string;
   last_updated_at?: string;
@@ -37,6 +46,33 @@ export interface Watch {
   stale: boolean;
   next_run?: string;
   price?: PriceSummary;
+}
+
+// Trip is the scheduled, watched entity — cron_expr/timezone live here,
+// not on individual legs. Legs is populated on list/get, not on create.
+export interface Trip {
+  id: string;
+  name: string;
+  cron_expr: string;
+  timezone: string;
+  enabled: boolean;
+  created_at: string;
+  legs?: Watch[];
+}
+
+export type RequestKind = "add_leg" | "remove_leg" | "create_trip";
+export type RequestStatus = "pending" | "approved" | "rejected";
+
+// Request is a Discord-submitted change awaiting approval from the
+// panel's Requests page — see backend/internal/service.RequestService.
+export interface Request {
+  id: string;
+  kind: RequestKind;
+  status: RequestStatus;
+  title: string;
+  note: string;
+  created_at: string;
+  resolved_at?: string;
 }
 
 export interface PriceSample {
@@ -119,8 +155,15 @@ export interface WatchInput {
   name: string;
   kind: AssetKind;
   enabled?: boolean;
+  params: WatchParams;
+  threshold_pct: number;
+  trip_id: string;
+}
+
+// Mirrors backend/internal/httpapi/handlers/tripRequest.
+export interface TripInput {
+  name: string;
   cron_expr: string;
   timezone: string;
-  params: FlightParams;
-  threshold_pct: number;
+  enabled?: boolean;
 }

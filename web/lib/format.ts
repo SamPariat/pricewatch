@@ -1,4 +1,4 @@
-import type { Watch } from "./types";
+import type { FlightParams, LodgingParams, Watch } from "./types";
 
 // Only the kindOneWay/kindReturn keys from the "watchForm" namespace are
 // used here — callers pass a next-intl translator already scoped to it
@@ -22,19 +22,25 @@ export function formatPrice(minor: number, currency: string): string {
 
 export function watchTitle(watch: Pick<Watch, "name" | "kind" | "params">, t: WatchFormTranslator): string {
   if (watch.name) return watch.name;
-  const p = watch.params;
+  if (watch.kind === "lodging_airbnb") return "Airbnb";
+  const p = watch.params as FlightParams;
   const suffix = watch.kind === "flight_return" ? t("kindReturn") : t("kindOneWay");
   return `${p.origin} → ${p.destination} · ${suffix}`;
 }
 
-export function watchDateRange(watch: Pick<Watch, "params">, locale: string): string {
-  const p = watch.params;
+export function watchDateRange(watch: Pick<Watch, "kind" | "params">, locale: string): string {
+  if (watch.kind === "lodging_airbnb") {
+    const p = watch.params as LodgingParams;
+    return `${formatShortDate(p.check_in, locale)} – ${formatShortDate(p.check_out, locale)}`;
+  }
+  const p = watch.params as FlightParams;
   return p.return_date
     ? `${formatShortDate(p.depart_date, locale)} – ${formatShortDate(p.return_date, locale)}`
     : formatShortDate(p.depart_date, locale);
 }
 
 export function watchSubtitle(watch: Pick<Watch, "kind" | "params">, t: WatchFormTranslator, locale: string): string {
+  if (watch.kind === "lodging_airbnb") return watchDateRange(watch, locale);
   const kindLabel = watch.kind === "flight_return" ? t("kindReturn") : t("kindOneWay");
   return `${kindLabel} · ${watchDateRange(watch, locale)}`;
 }

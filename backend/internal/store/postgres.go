@@ -27,10 +27,10 @@ func NewPostgres(pool *pgxpool.Pool) *Postgres {
 
 func (p *Postgres) CreateWatch(ctx context.Context, w domain.Watch) (domain.Watch, error) {
 	row := p.pool.QueryRow(ctx, `
-		INSERT INTO watches (name, kind, enabled, cron_expr, timezone, params, threshold_pct)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO watches (name, kind, enabled, params, threshold_pct, trip_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at`,
-		w.Name, string(w.Kind), w.Enabled, w.CronExpr, w.Timezone, w.Params, w.ThresholdPct,
+		w.Name, string(w.Kind), w.Enabled, w.Params, w.ThresholdPct, string(w.TripID),
 	)
 	var id string
 	if err := row.Scan(&id, &w.CreatedAt); err != nil {
@@ -42,7 +42,7 @@ func (p *Postgres) CreateWatch(ctx context.Context, w domain.Watch) (domain.Watc
 
 func (p *Postgres) GetWatch(ctx context.Context, id domain.WatchID) (domain.Watch, error) {
 	row := p.pool.QueryRow(ctx, `
-		SELECT id, name, kind, enabled, cron_expr, timezone, params, threshold_pct, created_at
+		SELECT id, name, kind, enabled, params, threshold_pct, created_at, trip_id
 		FROM watches WHERE id = $1`, string(id))
 	w, err := scanWatch(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -56,7 +56,7 @@ func (p *Postgres) GetWatch(ctx context.Context, id domain.WatchID) (domain.Watc
 
 func (p *Postgres) ListWatches(ctx context.Context) ([]domain.Watch, error) {
 	rows, err := p.pool.Query(ctx, `
-		SELECT id, name, kind, enabled, cron_expr, timezone, params, threshold_pct, created_at
+		SELECT id, name, kind, enabled, params, threshold_pct, created_at, trip_id
 		FROM watches ORDER BY created_at`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list watches: %w", err)
@@ -76,9 +76,9 @@ func (p *Postgres) ListWatches(ctx context.Context) ([]domain.Watch, error) {
 
 func (p *Postgres) UpdateWatch(ctx context.Context, w domain.Watch) (domain.Watch, error) {
 	cmd, err := p.pool.Exec(ctx, `
-		UPDATE watches SET name=$2, kind=$3, enabled=$4, cron_expr=$5, timezone=$6, params=$7, threshold_pct=$8
+		UPDATE watches SET name=$2, kind=$3, enabled=$4, params=$5, threshold_pct=$6, trip_id=$7
 		WHERE id=$1`,
-		string(w.ID), w.Name, string(w.Kind), w.Enabled, w.CronExpr, w.Timezone, w.Params, w.ThresholdPct,
+		string(w.ID), w.Name, string(w.Kind), w.Enabled, w.Params, w.ThresholdPct, string(w.TripID),
 	)
 	if err != nil {
 		return domain.Watch{}, fmt.Errorf("store: update watch: %w", err)
@@ -106,10 +106,11 @@ type rowScanner interface {
 
 func scanWatch(row rowScanner) (domain.Watch, error) {
 	var w domain.Watch
-	var id, kind string
-	err := row.Scan(&id, &w.Name, &kind, &w.Enabled, &w.CronExpr, &w.Timezone, &w.Params, &w.ThresholdPct, &w.CreatedAt)
+	var id, kind, tripID string
+	err := row.Scan(&id, &w.Name, &kind, &w.Enabled, &w.Params, &w.ThresholdPct, &w.CreatedAt, &tripID)
 	w.ID = domain.WatchID(id)
 	w.Kind = domain.AssetKind(kind)
+	w.TripID = domain.TripID(tripID)
 	return w, err
 }
 
@@ -348,6 +349,175 @@ func (p *Postgres) UpdateSettings(ctx context.Context, s domain.Settings) error 
 		return fmt.Errorf("store: update settings: %w", err)
 	}
 	return nil
+}
+
+// --- Trips ---
+
+func (p *Postgres) CreateTrip(ctx context.Context, t domain.Trip) (domain.Trip, error) {
+	row := p.pool.QueryRow(ctx, `
+		INSERT INTO trips (name, cron_expr, timezone, enabled)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at`,
+		t.Name, t.CronExpr, t.Timezone, t.Enabled,
+	)
+	var id string
+	if err := row.Scan(&id, &t.CreatedAt); err != nil {
+		return domain.Trip{}, fmt.Errorf("store: create trip: %w", err)
+	}
+	t.ID = domain.TripID(id)
+	return t, nil
+}
+
+func (p *Postgres) GetTrip(ctx context.Context, id domain.TripID) (domain.Trip, error) {
+	row := p.pool.QueryRow(ctx, `
+		SELECT id, name, cron_expr, timezone, enabled, created_at FROM trips WHERE id = $1`, string(id))
+	t, err := scanTrip(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Trip{}, fmt.Errorf("store: trip %s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return domain.Trip{}, fmt.Errorf("store: get trip: %w", err)
+	}
+	return t, nil
+}
+
+func (p *Postgres) ListTrips(ctx context.Context) ([]domain.Trip, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, name, cron_expr, timezone, enabled, created_at FROM trips ORDER BY created_at`)
+	if err != nil {
+		return nil, fmt.Errorf("store: list trips: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Trip
+	for rows.Next() {
+		t, err := scanTrip(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: scan trip: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) UpdateTrip(ctx context.Context, t domain.Trip) (domain.Trip, error) {
+	cmd, err := p.pool.Exec(ctx, `
+		UPDATE trips SET name=$2, cron_expr=$3, timezone=$4, enabled=$5
+		WHERE id=$1`,
+		string(t.ID), t.Name, t.CronExpr, t.Timezone, t.Enabled,
+	)
+	if err != nil {
+		return domain.Trip{}, fmt.Errorf("store: update trip: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return domain.Trip{}, fmt.Errorf("store: trip %s: %w", t.ID, ErrNotFound)
+	}
+	return p.GetTrip(ctx, t.ID)
+}
+
+// DeleteTrip relies on the trips/watches.trip_id FK's ON DELETE CASCADE —
+// every leg belonging to this trip is removed along with it, no separate
+// cleanup query needed.
+func (p *Postgres) DeleteTrip(ctx context.Context, id domain.TripID) error {
+	cmd, err := p.pool.Exec(ctx, `DELETE FROM trips WHERE id = $1`, string(id))
+	if err != nil {
+		return fmt.Errorf("store: delete trip: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("store: trip %s: %w", id, ErrNotFound)
+	}
+	return nil
+}
+
+func scanTrip(row rowScanner) (domain.Trip, error) {
+	var t domain.Trip
+	var id string
+	err := row.Scan(&id, &t.Name, &t.CronExpr, &t.Timezone, &t.Enabled, &t.CreatedAt)
+	t.ID = domain.TripID(id)
+	return t, err
+}
+
+// --- Requests ---
+
+func (p *Postgres) CreateRequest(ctx context.Context, r domain.Request) (domain.Request, error) {
+	row := p.pool.QueryRow(ctx, `
+		INSERT INTO requests (kind, payload, status, title, note)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, created_at`,
+		string(r.Kind), r.Payload, string(r.Status), r.Title, r.Note,
+	)
+	var id string
+	if err := row.Scan(&id, &r.CreatedAt); err != nil {
+		return domain.Request{}, fmt.Errorf("store: create request: %w", err)
+	}
+	r.ID = domain.RequestID(id)
+	return r, nil
+}
+
+func (p *Postgres) GetRequest(ctx context.Context, id domain.RequestID) (domain.Request, error) {
+	row := p.pool.QueryRow(ctx, `
+		SELECT id, kind, payload, status, title, note, created_at, resolved_at
+		FROM requests WHERE id = $1`, string(id))
+	r, err := scanRequest(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Request{}, fmt.Errorf("store: request %s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return domain.Request{}, fmt.Errorf("store: get request: %w", err)
+	}
+	return r, nil
+}
+
+func (p *Postgres) ListRequests(ctx context.Context, status domain.RequestStatus) ([]domain.Request, error) {
+	var rows pgx.Rows
+	var err error
+	if status == "" {
+		rows, err = p.pool.Query(ctx, `
+			SELECT id, kind, payload, status, title, note, created_at, resolved_at
+			FROM requests ORDER BY created_at DESC`)
+	} else {
+		rows, err = p.pool.Query(ctx, `
+			SELECT id, kind, payload, status, title, note, created_at, resolved_at
+			FROM requests WHERE status = $1 ORDER BY created_at DESC`, string(status))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: list requests: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Request
+	for rows.Next() {
+		r, err := scanRequest(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: scan request: %w", err)
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) ResolveRequest(ctx context.Context, id domain.RequestID, status domain.RequestStatus) error {
+	cmd, err := p.pool.Exec(ctx, `
+		UPDATE requests SET status=$2, resolved_at=now() WHERE id=$1`,
+		string(id), string(status),
+	)
+	if err != nil {
+		return fmt.Errorf("store: resolve request: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("store: request %s: %w", id, ErrNotFound)
+	}
+	return nil
+}
+
+func scanRequest(row rowScanner) (domain.Request, error) {
+	var r domain.Request
+	var id, kind, status string
+	err := row.Scan(&id, &kind, &r.Payload, &status, &r.Title, &r.Note, &r.CreatedAt, &r.ResolvedAt)
+	r.ID = domain.RequestID(id)
+	r.Kind = domain.RequestKind(kind)
+	r.Status = domain.RequestStatus(status)
+	return r, err
 }
 
 var ErrNotFound = errors.New("not found")

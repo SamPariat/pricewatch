@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="flex items-center justify-between border-b border-border px-5 pb-3 pt-5 md:hidden">
         <span className="text-[15px] font-bold tracking-tight">Pricewatch</span>
         <Link
-          href="/watches/new"
+          href="/trips/new"
           className="flex size-8.5 items-center justify-center rounded-md bg-primary text-primary-foreground"
         >
           <Plus className="size-4" />

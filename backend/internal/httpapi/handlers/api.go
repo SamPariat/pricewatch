@@ -24,6 +24,8 @@ const APIVersion = "v1"
 
 type API struct {
 	Watches   *service.WatchService
+	Trips     *service.TripService
+	Requests  *service.RequestService
 	Settings  *service.SettingsService
 	Runs      *service.RunsService
 	Analytics *service.AnalyticsService

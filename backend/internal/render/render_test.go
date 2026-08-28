@@ -219,12 +219,12 @@ func TestDigest_NamedWatchUsesNameOverDerivedTitle(t *testing.T) {
 }
 
 func TestCombineDigest_Pluralizes(t *testing.T) {
-	one := CombineDigest([]domain.Embed{{Title: "section a"}}, i18n.EN)
+	one := CombineDigest([]domain.Embed{{Title: "section a"}}, "", i18n.EN)
 	if !strings.Contains(one.Content, "1 watch") || strings.Contains(one.Content, "1 watches") {
 		t.Errorf("expected singular 'watch', got: %q", one.Content)
 	}
 
-	two := CombineDigest([]domain.Embed{{Title: "section a"}, {Title: "section b"}}, i18n.EN)
+	two := CombineDigest([]domain.Embed{{Title: "section a"}, {Title: "section b"}}, "", i18n.EN)
 	if !strings.Contains(two.Content, "2 watches") {
 		t.Errorf("expected plural 'watches', got: %q", two.Content)
 	}
@@ -239,7 +239,7 @@ func TestCombineDigest_Pluralizes(t *testing.T) {
 // digest.header_singular are deliberately identical strings in the
 // shared locales/hi.json catalog.
 func TestCombineDigest_Hindi_NoPluralSuffix(t *testing.T) {
-	two := CombineDigest([]domain.Embed{{Title: "a"}, {Title: "b"}}, i18n.HI)
+	two := CombineDigest([]domain.Embed{{Title: "a"}, {Title: "b"}}, "", i18n.HI)
 	if !strings.Contains(two.Content, "2 वॉच") {
 		t.Errorf("expected the Hindi header with count 2, got: %q", two.Content)
 	}

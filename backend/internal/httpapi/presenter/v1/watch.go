@@ -13,11 +13,10 @@ import (
 
 type Watch struct {
 	ID                  string          `json:"id"`
+	TripID              string          `json:"trip_id"`
 	Name                string          `json:"name"`
 	Kind                string          `json:"kind"`
 	Enabled             bool            `json:"enabled"`
-	CronExpr            string          `json:"cron_expr"`
-	Timezone            string          `json:"timezone"`
 	Params              json.RawMessage `json:"params"`
 	ThresholdPct        float64         `json:"threshold_pct"`
 	CreatedAt           time.Time       `json:"created_at"`
@@ -49,11 +48,10 @@ type PriceSummary struct {
 func WatchOf(w domain.Watch, state domain.WatchState, nextRun time.Time, interval time.Duration, lastUpdatedAt *time.Time, price *PriceSummary) Watch {
 	dto := Watch{
 		ID:                  string(w.ID),
+		TripID:              string(w.TripID),
 		Name:                w.Name,
 		Kind:                string(w.Kind),
 		Enabled:             w.Enabled,
-		CronExpr:            w.CronExpr,
-		Timezone:            w.Timezone,
 		Params:              w.Params,
 		ThresholdPct:        w.ThresholdPct,
 		CreatedAt:           w.CreatedAt,

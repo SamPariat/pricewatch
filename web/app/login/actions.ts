@@ -33,7 +33,7 @@ export async function login(_prevState: string | null, formData: FormData): Prom
     maxAge: 60 * 60 * 24 * 7, // 7 days — matches backend handlers.API.SessionTTL
   });
 
-  redirect("/watches");
+  redirect("/trips");
 }
 
 export async function logout(): Promise<void> {

@@ -5,21 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { AssetKind, Watch } from "@/lib/types";
+import type { AssetKind, FlightParams, LodgingParams, Watch } from "@/lib/types";
 import { createWatchAction, updateWatchAction, type FormState } from "@/app/(app)/watches/actions";
 import { useTranslations } from "next-intl";
 
-export function WatchForm({ watch }: { watch?: Watch }) {
+// tripId is required for a new leg (the trip it's being added to);
+// ignored for an edit, since watch.trip_id already carries it and legs
+// aren't reassignable to a different trip from this form.
+export function WatchForm({ watch, tripId }: { watch?: Watch; tripId?: string }) {
   const t = useTranslations("watchForm");
   const kindLabel: Record<AssetKind, string> = {
     flight_one_way: t("kindOneWay"),
     flight_return: t("kindReturn"),
+    lodging_airbnb: t("kindAirbnb"),
   };
 
   const [kind, setKind] = useState<AssetKind>(watch?.kind ?? "flight_return");
   const isReturn = kind === "flight_return";
-
-  const [hour, minute] = watch ? cronToTime(watch.cron_expr) : ["7", "0"];
+  const isLodging = kind === "lodging_airbnb";
+  const flightParams = watch?.kind !== "lodging_airbnb" ? (watch?.params as FlightParams | undefined) : undefined;
+  const lodgingParams = watch?.kind === "lodging_airbnb" ? (watch.params as LodgingParams) : undefined;
 
   const action = watch ? updateWatchAction.bind(null, watch.id) : createWatchAction;
   const initialState: FormState = { error: null };
@@ -27,10 +32,12 @@ export function WatchForm({ watch }: { watch?: Watch }) {
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      <input type="hidden" name="trip_id" value={watch?.trip_id ?? tripId ?? ""} />
+
       <div className="flex flex-col gap-2">
         <Label>{t("typeLabel")}</Label>
         <Tabs value={kind} onValueChange={(v) => setKind(v as AssetKind)}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             {(Object.keys(kindLabel) as AssetKind[]).map((k) => (
               <TabsTrigger key={k} value={k}>
                 {kindLabel[k]}
@@ -41,33 +48,41 @@ export function WatchForm({ watch }: { watch?: Watch }) {
         <input type="hidden" name="kind" value={kind} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label={t("originLabel")}>
-          <Input name="origin" defaultValue={watch?.params.origin} placeholder="BLR" required maxLength={3} className="uppercase" />
-        </Field>
-        <Field label={t("destinationLabel")}>
-          <Input name="destination" defaultValue={watch?.params.destination} placeholder="GOI" required maxLength={3} className="uppercase" />
-        </Field>
-        <Field label={t("departDateLabel")}>
-          <Input type="date" name="depart_date" defaultValue={watch?.params.depart_date} required />
-        </Field>
-        {isReturn && (
-          <Field label={t("returnDateLabel")}>
-            <Input type="date" name="return_date" defaultValue={watch?.params.return_date} required={isReturn} />
+      {isLodging ? (
+        <div className="grid grid-cols-2 gap-4">
+          <Field label={t("urlLabel")} className="col-span-2">
+            <Input type="url" name="url" defaultValue={lodgingParams?.url} placeholder="https://www.airbnb.com/rooms/..." required />
           </Field>
-        )}
-      </div>
+          <Field label={t("checkInLabel")}>
+            <Input type="date" name="check_in" defaultValue={lodgingParams?.check_in} required />
+          </Field>
+          <Field label={t("checkOutLabel")}>
+            <Input type="date" name="check_out" defaultValue={lodgingParams?.check_out} required />
+          </Field>
+          <Field label={t("guestsLabel")} className="col-span-2">
+            <Input type="number" name="guests" min={1} defaultValue={lodgingParams?.guests} />
+          </Field>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          <Field label={t("originLabel")}>
+            <Input name="origin" defaultValue={flightParams?.origin} placeholder="BLR" required maxLength={3} className="uppercase" />
+          </Field>
+          <Field label={t("destinationLabel")}>
+            <Input name="destination" defaultValue={flightParams?.destination} placeholder="GOI" required maxLength={3} className="uppercase" />
+          </Field>
+          <Field label={t("departDateLabel")}>
+            <Input type="date" name="depart_date" defaultValue={flightParams?.depart_date} required />
+          </Field>
+          {isReturn && (
+            <Field label={t("returnDateLabel")}>
+              <Input type="date" name="return_date" defaultValue={flightParams?.return_date} required={isReturn} />
+            </Field>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label={t("hourLabel")}>
-          <Input type="number" name="hour" min={0} max={23} defaultValue={hour} required />
-        </Field>
-        <Field label={t("minuteLabel")}>
-          <Input type="number" name="minute" min={0} max={59} defaultValue={minute} required />
-        </Field>
-        <Field label={t("timezoneLabel")} className="col-span-2">
-          <Input name="timezone" defaultValue={watch?.timezone ?? "Asia/Kolkata"} required />
-        </Field>
         <Field label={t("thresholdLabel")} className="col-span-2">
           <Input type="number" name="threshold_pct" min={1} max={90} defaultValue={watch?.threshold_pct ?? 15} required />
         </Field>
@@ -92,10 +107,4 @@ function Field({ label, className, children }: { label: string; className?: stri
       {children}
     </div>
   );
-}
-
-function cronToTime(cronExpr: string): [string, string] {
-  const parts = cronExpr.trim().split(/\s+/);
-  if (parts.length >= 2) return [parts[1], parts[0]];
-  return ["7", "0"];
 }

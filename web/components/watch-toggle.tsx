@@ -17,10 +17,9 @@ export function WatchToggle({ watch }: { watch: Watch }) {
         await toggleEnabledAction(watch.id, {
           name: watch.name,
           kind: watch.kind,
-          cron_expr: watch.cron_expr,
-          timezone: watch.timezone,
           params: watch.params,
           threshold_pct: watch.threshold_pct,
+          trip_id: watch.trip_id,
         }, checked);
       } catch {
         toast.error(t("toggleFailed"));

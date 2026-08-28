@@ -144,6 +144,113 @@
                 }
             }
         },
+        "/requests": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "List Discord-submitted change requests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "pending|approved|rejected — omit for all",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Request"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Approve a pending request — applies it via the normal WatchService/TripService methods",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    },
+                    "400": {
+                        "description": "the underlying action failed validation — the request stays pending",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "request not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Reject a pending request — no side effect beyond marking it rejected",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    },
+                    "404": {
+                        "description": "request not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/runs": {
             "get": {
                 "security": [
@@ -293,6 +400,194 @@
                     },
                     "500": {
                         "description": "update settings",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/trips": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trips"
+                ],
+                "summary": "List trips, each with its legs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trips"
+                ],
+                "summary": "Create a trip",
+                "parameters": [
+                    {
+                        "description": "Trip fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.tripRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid request body, or a validation error naming the bad field",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/trips/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trips"
+                ],
+                "summary": "Get a trip and its legs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trip ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip"
+                        }
+                    },
+                    "404": {
+                        "description": "trip not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "tags": [
+                    "trips"
+                ],
+                "summary": "Delete a trip and every leg in it",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trip ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "no content"
+                    },
+                    "404": {
+                        "description": "trip not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trips"
+                ],
+                "summary": "Replace a trip",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trip ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Full trip fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_httpapi_handlers.tripRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip"
+                        }
+                    },
+                    "404": {
+                        "description": "trip not found",
                         "schema": {
                             "type": "string"
                         }
@@ -722,6 +1017,29 @@
                 }
             }
         },
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Request": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.RunEvent": {
             "type": "object",
             "properties": {
@@ -769,6 +1087,36 @@
                 }
             }
         },
+        "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Trip": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "cron_expr": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "legs": {
+                    "description": "Legs is populated by the list/get handler from a separate\nListWatches call — Trip itself carries no leg data.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_SamPariat_pricewatch_internal_httpapi_presenter_v1.Watch": {
             "type": "object",
             "properties": {
@@ -776,9 +1124,6 @@
                     "type": "integer"
                 },
                 "created_at": {
-                    "type": "string"
-                },
-                "cron_expr": {
                     "type": "string"
                 },
                 "enabled": {
@@ -817,7 +1162,7 @@
                 "threshold_pct": {
                     "type": "number"
                 },
-                "timezone": {
+                "trip_id": {
                     "type": "string"
                 }
             }
@@ -848,12 +1193,26 @@
                 }
             }
         },
-        "internal_httpapi_handlers.watchRequest": {
+        "internal_httpapi_handlers.tripRequest": {
             "type": "object",
             "properties": {
                 "cron_expr": {
                     "type": "string"
                 },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_httpapi_handlers.watchRequest": {
+            "type": "object",
+            "properties": {
                 "enabled": {
                     "type": "boolean"
                 },
@@ -872,7 +1231,7 @@
                 "threshold_pct": {
                     "type": "number"
                 },
-                "timezone": {
+                "trip_id": {
                     "type": "string"
                 }
             }

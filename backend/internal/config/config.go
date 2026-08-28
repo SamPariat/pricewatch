@@ -22,6 +22,7 @@ type Config struct {
 	DatabaseURL logging.Secret
 
 	DiscordBotToken    logging.Secret
+	DiscordGuildID     string // required — slash commands register guild-scoped, not global
 	TravelpayoutsToken logging.Secret
 
 	GeminiAPIKey logging.Secret // optional — AI features disabled if empty
@@ -54,6 +55,7 @@ func Load() (Config, error) {
 		Port:               envOr("PORT", "8080"),
 		DatabaseURL:        logging.Secret(req("DATABASE_URL")),
 		DiscordBotToken:    logging.Secret(req("DISCORD_BOT_TOKEN")),
+		DiscordGuildID:     req("DISCORD_GUILD_ID"),
 		TravelpayoutsToken: logging.Secret(req("TRAVELPAYOUTS_TOKEN")),
 		GeminiAPIKey:       logging.Secret(os.Getenv("GEMINI_API_KEY")), // optional
 		GeminiModel:        os.Getenv("GEMINI_MODEL"),                   // optional
