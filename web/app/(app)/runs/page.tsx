@@ -56,12 +56,19 @@ function RunRow({ run, watch, locale, tForm }: { run: DigestRun; watch?: Watch; 
       className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm"
     >
       <Icon className={`size-[19px] shrink-0 ${color}`} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[14px] font-semibold">{watch ? watchTitle(watch, tForm) : run.watch_id}</span>
         <span className="font-mono text-[11.5px] text-muted-foreground">
           {new Date(run.started_at).toLocaleTimeString(timeTag, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          {run.status === "failed" && run.error ? ` · ${run.error}` : ""}
         </span>
+        {/* Full error lives on the run-detail timeline this row links to
+            (RunDetailPage) — a raw Go error string, often a long
+            URL-bearing wrapped error, was dumped in full here before and
+            it made the list unreadable. One clamped line is enough to
+            recognize "which run failed and roughly why" at a glance. */}
+        {run.status === "failed" && run.error && (
+          <span className="line-clamp-1 text-[11.5px] break-all text-destructive/80">{run.error}</span>
+        )}
       </div>
     </Link>
   );
