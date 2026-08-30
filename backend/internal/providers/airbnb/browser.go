@@ -13,6 +13,11 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// startupTimeout bounds how long NewBrowser waits for Chrome to launch
+// and its DevTools websocket to come up, before failing DI outright
+// instead of hanging the server's startup indefinitely.
+const startupTimeout = 20 * time.Second
+
 // Browser owns one shared, long-lived Chrome process — many short-lived
 // tabs are opened off it per fetch, not one process per fetch, which
 // would be far too heavy for headless-render fetches running repeatedly
@@ -49,7 +54,18 @@ func NewBrowser() (*Browser, error) {
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 
-	if err := chromedp.Run(ctx); err != nil {
+	// Bounded only for this initial launch-and-connect check — chromedp.Run
+	// blocks until Chrome's DevTools websocket is up, with no deadline of
+	// its own, so a Chrome that fails to come up cleanly (stale lock files
+	// after an unclean shutdown, resource contention right after a host
+	// sleep/wake, ...) would otherwise hang this call forever and, with it,
+	// the whole di.New() startup path — the server would never bind its
+	// port and every health check would fail with no log line explaining
+	// why. ctx itself (used for real tab traffic afterward) stays
+	// undecorated; each scrape already gets its own bound via NewTab.
+	startCtx, cancelStart := context.WithTimeout(ctx, startupTimeout)
+	defer cancelStart()
+	if err := chromedp.Run(startCtx); err != nil {
 		cancelCtx()
 		cancelAlloc()
 		return nil, fmt.Errorf("airbnb: launch browser: %w", err)
